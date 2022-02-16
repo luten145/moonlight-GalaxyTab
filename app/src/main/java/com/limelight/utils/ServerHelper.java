@@ -27,8 +27,25 @@ import java.security.cert.CertificateEncodingException;
 public class ServerHelper {
     public static final String CONNECTION_TEST_SERVER = "android.conntest.moonlight-stream.org";
 
+    public static boolean restart = false;
+    public static String reActiveAddress;
+    public static String reUniqueId;
+    public static String reUuid;
+    public static String reName;
+    public static byte[] reServerCert;
+
+
     public static String getCurrentAddressFromComputer(ComputerDetails computer) {
-        return computer.activeAddress;
+        String aA;
+        if(!restart){
+            aA = computer.activeAddress;
+            reActiveAddress = computer.activeAddress;
+        }
+        else {
+            aA = reActiveAddress;
+        }
+
+        return aA;
     }
 
     public static Intent createPcShortcutIntent(Activity parent, ComputerDetails computer) {
@@ -57,12 +74,33 @@ public class ServerHelper {
         intent.putExtra(Game.EXTRA_APP_NAME, app.getAppName());
         intent.putExtra(Game.EXTRA_APP_ID, app.getAppId());
         intent.putExtra(Game.EXTRA_APP_HDR, app.isHdrSupported());
-        intent.putExtra(Game.EXTRA_UNIQUEID, managerBinder.getUniqueId());
-        intent.putExtra(Game.EXTRA_PC_UUID, computer.uuid);
-        intent.putExtra(Game.EXTRA_PC_NAME, computer.name);
+        if(!restart){
+            intent.putExtra(Game.EXTRA_UNIQUEID, managerBinder.getUniqueId());
+            intent.putExtra(Game.EXTRA_PC_UUID, computer.uuid);
+            intent.putExtra(Game.EXTRA_PC_NAME, computer.name);
+
+
+            reUniqueId = managerBinder.getUniqueId();
+            reUuid = computer.uuid;
+            reName = computer.name;
+        }
+        else {
+            intent.putExtra(Game.EXTRA_UNIQUEID, reUniqueId);
+            intent.putExtra(Game.EXTRA_PC_UUID, reUuid);
+            intent.putExtra(Game.EXTRA_PC_NAME, reName);
+            intent.addFlags (Intent.FLAG_ACTIVITY_NO_ANIMATION);
+        }
+
         try {
-            if (computer.serverCert != null) {
-                intent.putExtra(Game.EXTRA_SERVER_CERT, computer.serverCert.getEncoded());
+
+            if (!restart){
+                if (computer.serverCert != null) {
+                    intent.putExtra(Game.EXTRA_SERVER_CERT, computer.serverCert.getEncoded());
+                    reServerCert = computer.serverCert.getEncoded();
+                }
+            }
+            else {
+                intent.putExtra(Game.EXTRA_SERVER_CERT, reServerCert);
             }
         } catch (CertificateEncodingException e) {
             e.printStackTrace();
@@ -78,6 +116,14 @@ public class ServerHelper {
             return;
         }
         parent.startActivity(createStartIntent(parent, app, computer, managerBinder));
+    }
+    public static void redoStart(Activity parent, NvApp app, ComputerDetails computer,
+                               ComputerManagerService.ComputerManagerBinder managerBinder) {
+        restart = true;
+
+        parent.startActivity(createStartIntent(parent, app, computer, managerBinder));
+
+
     }
 
     public static void doNetworkTest(final Activity parent) {

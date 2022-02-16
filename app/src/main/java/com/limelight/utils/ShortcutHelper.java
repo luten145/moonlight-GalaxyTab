@@ -27,16 +27,10 @@ public class ShortcutHelper {
 
     public ShortcutHelper(Activity context) {
         this.context = context;
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N_MR1) {
-            sm = context.getSystemService(ShortcutManager.class);
-        }
-        else {
-            sm = null;
-        }
+        sm = context.getSystemService(ShortcutManager.class);
         this.tvChannelHelper = new TvChannelHelper(context);
     }
 
-    @TargetApi(Build.VERSION_CODES.N_MR1)
     private void reapShortcutsForDynamicAdd() {
         List<ShortcutInfo> dynamicShortcuts = sm.getDynamicShortcuts();
         while (!dynamicShortcuts.isEmpty() && dynamicShortcuts.size() >= sm.getMaxShortcutCountPerActivity()) {
@@ -50,7 +44,6 @@ public class ShortcutHelper {
         }
     }
 
-    @TargetApi(Build.VERSION_CODES.N_MR1)
     private List<ShortcutInfo> getAllShortcuts() {
         LinkedList<ShortcutInfo> list = new LinkedList<>();
         list.addAll(sm.getDynamicShortcuts());
@@ -58,7 +51,6 @@ public class ShortcutHelper {
         return list;
     }
 
-    @TargetApi(Build.VERSION_CODES.N_MR1)
     private ShortcutInfo getInfoForId(String id) {
         List<ShortcutInfo> shortcuts = getAllShortcuts();
 
@@ -71,7 +63,6 @@ public class ShortcutHelper {
         return null;
     }
 
-    @TargetApi(Build.VERSION_CODES.N_MR1)
     private boolean isExistingDynamicShortcut(String id) {
         for (ShortcutInfo si : sm.getDynamicShortcuts()) {
             if (si.getId().equals(id)) {
@@ -101,7 +92,7 @@ public class ShortcutHelper {
                     .setIntent(ServerHelper.createPcShortcutIntent(context, computer))
                     .setShortLabel(computer.name)
                     .setLongLabel(computer.name)
-                    .setIcon(Icon.createWithResource(context, R.mipmap.ic_pc_scut))
+                    .setIcon(Icon.createWithResource(context, R.drawable.ic_computer))
                     .build();
 
             ShortcutInfo existingSinfo = getInfoForId(computer.uuid);
@@ -156,19 +147,20 @@ public class ShortcutHelper {
             if (iconBits != null) {
                 appIcon = Icon.createWithAdaptiveBitmap(iconBits);
             } else {
-                appIcon = Icon.createWithResource(context, R.mipmap.ic_pc_scut);
+                appIcon = Icon.createWithResource(context, R.drawable.ic_computer);
             }
 
             ShortcutInfo sInfo = new ShortcutInfo.Builder(context, getShortcutIdForGame(computer, app))
                 .setIntent(ServerHelper.createAppShortcutIntent(context, computer, app))
-                .setShortLabel(app.getAppName() + " (" + computer.name + ")")
-                .setIcon(appIcon)
+                .setShortLabel(app.getAppName())
+                .setIcon(Icon.createWithResource(context, R.drawable.ic_computer))
                 .build();
 
             return sm.requestPinShortcut(sInfo, null);
         } else {
             return false;
         }
+
     }
 
     public void disableComputerShortcut(ComputerDetails computer, CharSequence reason) {

@@ -1,84 +1,236 @@
-<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:orientation="horizontal"
     android:paddingLeft="@dimen/activity_horizontal_margin"
-    android:paddingRight="@dimen/activity_horizontal_margin"
     android:paddingTop="@dimen/activity_vertical_margin"
-    tools:context=".PcView" >
+    android:paddingRight="@dimen/activity_horizontal_margin"
+    tools:context=".PcView">
 
-    <RelativeLayout
-        android:id="@+id/pcFragmentContainer"
-        android:layout_width="fill_parent"
-        android:layout_height="wrap_content"
-        android:gravity="center"
-        android:layout_alignParentBottom="true"
-        android:layout_alignParentTop="true"
-        android:layout_toRightOf="@+id/settingsButton"
-        android:layout_toEndOf="@+id/settingsButton">
-
-        <RelativeLayout
-            android:id="@+id/no_pc_found_layout"
-            android:layout_width="wrap_content"
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_weight="2">
+        <LinearLayout
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_centerVertical="true"
-            android:layout_centerHorizontal="true">
-            <ProgressBar
-                android:id="@+id/pcs_loading"
-                android:layout_width="75dp"
-                android:layout_height="75dp"
-                android:indeterminate="true"/>
+            android:orientation="vertical"
+            android:paddingLeft="@dimen/activity_horizontal_margin"
+            android:paddingTop="@dimen/activity_vertical_margin"
+            android:paddingRight="@dimen/activity_horizontal_margin">
+
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_toRightOf="@+id/pcs_loading"
-                android:layout_toEndOf="@+id/pcs_loading"
-                android:layout_marginLeft="10dp"
-                android:layout_marginStart="10dp"
-                android:layout_centerVertical="true"
-                android:textAppearance="?android:attr/textAppearanceLarge"
+                android:layout_marginVertical="100dp"
+                android:layout_gravity="center"
                 android:gravity="center"
-                android:text="@string/searching_pc"/>
-        </RelativeLayout>
+                android:textColor="@color/Secondary"
+                android:textSize="50dp"
+                android:text="원격 제어" />
 
-    </RelativeLayout>
+            <LinearLayout
+                android:id="@+id/network_view"
+                android:background="@drawable/ic_pc_backguornd"
+                android:layout_width="300dp"
+                android:layout_height="150dp"
+                android:layout_gravity="center"
+                android:orientation="vertical"
+                android:visibility="gone">
 
-    <ImageButton
-        android:id="@+id/settingsButton"
-        android:layout_width="70dp"
-        android:layout_height="65dp"
-        android:cropToPadding="false"
-        android:scaleType="fitXY"
-        android:nextFocusForward="@id/helpButton"
-        android:layout_alignParentStart="true"
-        android:layout_alignParentLeft="true"
+                <LinearLayout
+                    android:background="@drawable/ic_pc_backguornd"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:layout_weight="2"
+                    android:gravity="bottom">
+
+                    <LinearLayout
+                        android:background="@drawable/ic_pc_backguornd"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:orientation="horizontal">
+
+                        <ImageView
+                            android:background="@color/Background2"
+                            android:id="@+id/network_ic"
+                            android:layout_width="200dp"
+                            android:layout_height="60dp"
+                            android:layout_gravity="center"
+                            android:layout_marginLeft="20dp"
+                            android:layout_marginRight="10dp"
+                            android:layout_weight="3"
+                            android:adjustViewBounds="true"/>
+
+                        <LinearLayout
+                            android:background="@drawable/ic_pc_backguornd"
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:layout_gravity="center"
+                            android:layout_weight="2"
+                            android:orientation="horizontal">
+
+                            <LinearLayout
+                                android:background="@drawable/ic_pc_backguornd"
+                                android:layout_width="match_parent"
+                                android:layout_height="match_parent"
+                                android:layout_marginTop="10dp"
+                                android:orientation="vertical">
+
+                                <TextView
+                                    android:id="@+id/network_table_1"
+                                    android:background="@color/Background2"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="match_parent"
+                                    android:layout_gravity="center"
+                                    android:layout_weight="1"
+                                    android:textColor="@color/textColor"
+                                    android:textSize="20dp"/>
+
+                                <TextView
+                                    android:id="@+id/network_table_2"
+                                    android:background="@color/Background2"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="match_parent"
+                                    android:layout_gravity="center"
+                                    android:layout_weight="1"
+                                    android:textColor="@color/textColor"
+                                    android:textSize="20dp" />
+
+                            </LinearLayout>
+                        </LinearLayout>
+                    </LinearLayout>
+                </LinearLayout>
+
+                <LinearLayout
+                    android:background="@drawable/ic_pc_backguornd"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:layout_weight="3"
+                    android:gravity="top"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:id="@+id/network_table_3"
+                        android:background="@color/Background2"
+                        android:layout_width="match_parent"
+                        android:layout_height="30dp"
+                        android:layout_marginTop="3dp"
+                        android:gravity="center"
+                        android:autoSizeTextType="uniform"
+                        android:textColor="@color/textColor"/>
+
+                </LinearLayout>
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_gravity="right"
+                android:layout_marginVertical="15dp"
+                android:layout_weight="1"
+                android:gravity="right">
+
+                <ImageButton
+                    android:id="@+id/settingsButton"
+                    android:background="@color/Background"
+                    android:layout_width="30dp"
+                    android:layout_height="30dp"
+                    android:layout_marginHorizontal="2dp"
+                    android:cropToPadding="false"
+                    android:nextFocusForward="@id/helpButton"
+                    android:scaleType="fitXY"
+                    android:src="@drawable/ic_setting" />
+
+                <ImageButton
+                    android:id="@+id/helpButton"
+                    android:layout_width="70dp"
+                    android:layout_height="65dp"
+                    android:layout_below="@id/settingsButton"
+                    android:layout_marginHorizontal="2dp"
+                    android:cropToPadding="false"
+                    android:nextFocusForward="@id/manuallyAddPc"
+                    android:scaleType="fitXY"
+                    android:src="@drawable/ic_help"
+                    android:visibility="gone"/>
+
+                <ImageButton
+                    android:id="@+id/manuallyAddPc"
+                    android:background="@color/Background"
+                    android:layout_width="30dp"
+                    android:layout_height="30dp"
+                    android:layout_below="@id/helpButton"
+                    android:layout_marginHorizontal="2dp"
+                    android:cropToPadding="false"
+                    android:scaleType="fitXY"
+                    android:src="@drawable/ic_add"/>
+
+            </LinearLayout>
+
+            <RelativeLayout
+                android:id="@+id/pcFragmentContainer"
+                android:background="@color/Background2"
+                android:layout_width="fill_parent"
+                android:layout_height="wrap_content"
+                android:layout_alignParentTop="true"
+                android:layout_alignParentBottom="true"
+                android:layout_toEndOf="@+id/settingsButton"
+                android:layout_toRightOf="@+id/settingsButton"
+                android:gravity="center">
+
+                <RelativeLayout
+                    android:id="@+id/no_pc_found_layout"
+                    android:background="@color/Background1"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_centerHorizontal="true"
+                    android:layout_centerVertical="true">
+
+                    <ProgressBar
+                        android:id="@+id/pcs_loading"
+                        android:background="@color/Background1"
+                        android:layout_width="75dp"
+                        android:layout_height="75dp"
+                        android:indeterminate="true" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_centerVertical="true"
+                        android:layout_marginStart="10dp"
+                        android:layout_marginLeft="10dp"
+                        android:layout_toEndOf="@+id/pcs_loading"
+                        android:layout_toRightOf="@+id/pcs_loading"
+                        android:gravity="center"
+                        android:text="@string/searching_pc"
+                        android:textAppearance="?android:attr/textAppearanceLarge" />
+                </RelativeLayout>
+            </RelativeLayout>
+        </LinearLayout>
+    </ScrollView>
+
+    <RelativeLayout
+        android:id="@+id/fragmenttest"
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content"
         android:layout_alignParentTop="true"
-        android:src="@drawable/ic_settings"
-        style="?android:attr/borderlessButtonStyle"/>
+        android:layout_alignParentBottom="true"
+        android:layout_toEndOf="@+id/settingsButton"
+        android:layout_toRightOf="@+id/settingsButton"
+        android:layout_marginVertical="10dp"
+        android:layout_weight="1"
+        android:gravity="center"
+        android:visibility="gone">
 
-    <ImageButton
-        android:id="@+id/helpButton"
-        android:layout_width="70dp"
-        android:layout_height="65dp"
-        android:cropToPadding="false"
-        android:scaleType="fitXY"
-        android:nextFocusForward="@id/manuallyAddPc"
-        android:layout_alignParentStart="true"
-        android:layout_alignParentLeft="true"
-        android:layout_below="@id/settingsButton"
-        android:src="@drawable/ic_help"
-        style="?android:attr/borderlessButtonStyle"/>
+        <RelativeLayout
+            android:background="@color/Background1"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_centerHorizontal="true"
+            android:layout_centerVertical="true">
 
-    <ImageButton
-        android:id="@+id/manuallyAddPc"
-        android:layout_width="70dp"
-        android:layout_height="65dp"
-        android:cropToPadding="false"
-        android:scaleType="fitXY"
-        android:layout_alignParentStart="true"
-        android:layout_alignParentLeft="true"
-        android:layout_below="@id/helpButton"
-        android:src="@drawable/ic_add"
-        style="?android:attr/borderlessButtonStyle"/>
-
-</RelativeLayout>
+        </RelativeLayout>
+    </RelativeLayout>
+</LinearLayout>

@@ -43,6 +43,7 @@ import android.widget.AbsListView;
 import android.widget.AdapterView;
 import android.widget.AdapterView.OnItemClickListener;
 import android.widget.ImageView;
+import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.Toast;
 import android.widget.AdapterView.AdapterContextMenuInfo;
@@ -78,7 +79,26 @@ public class AppView extends Activity implements AdapterFragmentCallbacks {
     public final static String NEW_PAIR_EXTRA = "NewPair";
     public final static String SHOW_HIDDEN_APPS_EXTRA = "ShowHiddenApps";
 
+    public static Bitmap reBitrate;
+
+    //비트레이트 조정 관련 변수
+    public TextView appViewBitrate;
+
+    private PreferenceConfiguration prefConfig;
+
+    public static int setBitrate;
+    public static float setBitratefloat;
+    public SeekBar seekBitrate;
+
+    public static NvApp restartConnection;
+    public static ComputerDetails recomputer;
+    public static ComputerManagerService.ComputerManagerBinder remanagerBinder;
+    public static  Activity reActivity;
+
     private ComputerManagerService.ComputerManagerBinder managerBinder;
+
+
+    //서비스 연결
     private final ServiceConnection serviceConnection = new ServiceConnection() {
         public void onServiceConnected(ComponentName className, IBinder binder) {
             final ComputerManagerService.ComputerManagerBinder localBinder =
@@ -151,22 +171,20 @@ public class AppView extends Activity implements AdapterFragmentCallbacks {
                 }
             }.start();
         }
-
         public void onServiceDisconnected(ComponentName className) {
             managerBinder = null;
         }
     };
 
+    //화면 회전과같은 화면변화시 호출함수
     @Override
     public void onConfigurationChanged(Configuration newConfig) {
         super.onConfigurationChanged(newConfig);
-
         // If appGridAdapter is initialized, let it know about the configuration change.
         // If not, it will pick it up when it initializes.
         if (appGridAdapter != null) {
             // Update the app grid adapter to create grid items with the correct layout
             appGridAdapter.updateLayoutWithPreferences(this, PreferenceConfiguration.readPreferences(this));
-
             try {
                 // Reinflate the app grid itself to pick up the layout change
                 getFragmentManager().beginTransaction()
@@ -178,12 +196,12 @@ public class AppView extends Activity implements AdapterFragmentCallbacks {
         }
     }
 
+    //컴퓨터 상태 업데이트
     private void startComputerUpdates() {
         // Don't start polling if we're not bound or in the foreground
         if (managerBinder == null || !inForeground) {
             return;
         }
-
         managerBinder.startPolling(new ComputerManagerListener() {
             @Override
             public void notifyComputerUpdated(final ComputerDetails details) {
@@ -191,12 +209,10 @@ public class AppView extends Activity implements AdapterFragmentCallbacks {
                 if (suspendGridUpdates) {
                     return;
                 }
-
                 // Don't care about other computers
                 if (!details.uuid.equalsIgnoreCase(uuidString)) {
                     return;
                 }
-
                 if (details.state == ComputerDetails.State.OFFLINE) {
                     // The PC is unreachable now
                     AppView.this.runOnUiThread(new Runnable() {
@@ -207,10 +223,8 @@ public class AppView extends Activity implements AdapterFragmentCallbacks {
                             finish();
                         }
                     });
-
                     return;
                 }
-
                 // Close immediately if the PC is no longer paired
                 if (details.state == ComputerDetails.State.ONLINE && details.pairState != PairingManager.PairState.PAIRED) {
                     AppView.this.runOnUiThread(new Runnable() {
@@ -225,10 +239,8 @@ public class AppView extends Activity implements AdapterFragmentCallbacks {
                             finish();
                         }
                     });
-
                     return;
                 }
-
                 // App list is the same or empty
                 if (details.rawAppList == null || details.rawAppList.equals(lastRawApplist)) {
 
@@ -238,13 +250,10 @@ public class AppView extends Activity implements AdapterFragmentCallbacks {
                         lastRunningAppId = details.runningGameId;
                         updateUiWithServerinfo(details);
                     }
-
                     return;
                 }
-
                 lastRunningAppId = details.runningGameId;
                 lastRawApplist = details.rawAppList;
-
                 try {
                     updateUiWithAppList(NvHTTP.getAppListByReader(new StringReader(details.rawAppList)));
                     updateUiWithServerinfo(details);
@@ -258,41 +267,35 @@ public class AppView extends Activity implements AdapterFragmentCallbacks {
                 }
             }
         });
-
         if (poller == null) {
             poller = managerBinder.createAppListPoller(computer);
         }
         poller.start();
     }
 
+    //컴퓨터 업데이트 종료
     private void stopComputerUpdates() {
         if (poller != null) {
             poller.stop();
         }
-
         if (managerBinder != null) {
             managerBinder.stopPolling();
         }
-
         if (appGridAdapter != null) {
             appGridAdapter.cancelQueuedOperations();
         }
     }
 
+    //클래스 시작시 함수
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-
         // Assume we're in the foreground when created to avoid a race
         // between binding to CMS and onResume()
         inForeground = true;
-
         shortcutHelper = new ShortcutHelper(this);
-
         UiHelper.setLocale(this);
-
         setContentView(R.layout.activity_app_view);
-
         UiHelper.notifyNewRootView(this);
 
         showHiddenApps = getIntent().getBooleanExtra(SHOW_HIDDEN_APPS_EXTRA, false);
@@ -312,6 +315,34 @@ public class AppView extends Activity implements AdapterFragmentCallbacks {
         // Bind to the computer manager service
         bindService(new Intent(this, ComputerManagerService.class), serviceConnection,
                 Service.BIND_AUTO_CREATE);
+
+        prefConfig = PreferenceConfiguration.readPreferences(this);
+
+        String strBitrate = String.valueOf(prefConfig.bitrate/1000);
+
+        appViewBitrate = findViewById(R.id.setBitrate);
+        appViewBitrate.setText( strBitrate+"Mbps");
+
+        setBitrate = prefConfig.bitrate;
+        setBitratefloat = prefConfig.bitrate;
+
+        seekBitrate = findViewById(R.id.seekBar);
+        seekBitrate.setProgress((short)((setBitratefloat /150000)*100));
+        seekBitrate.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+
+                setBitrate = (150000/100)*progress;
+                appViewBitrate.setText( setBitrate/1000+"Mbps");
+            }
+            @Override
+            public void onStartTrackingTouch(SeekBar seekBar) {
+            }
+
+            @Override
+            public void onStopTrackingTouch(SeekBar seekBar) {
+            }
+        });
     }
 
     private void updateHiddenApps(boolean hideImmediately) {
@@ -392,6 +423,7 @@ public class AppView extends Activity implements AdapterFragmentCallbacks {
 
         menu.setHeaderTitle(selectedApp.app.getAppName());
 
+
         if (lastRunningAppId != 0) {
             if (lastRunningAppId == selectedApp.app.getAppId()) {
                 menu.add(Menu.NONE, START_OR_RESUME_ID, 1, getResources().getString(R.string.applist_menu_resume));
@@ -430,10 +462,17 @@ public class AppView extends Activity implements AdapterFragmentCallbacks {
     public void onContextMenuClosed(Menu menu) {
     }
 
+    public static void restertConnection (Activity ac) {
+        ac.finish();
+        ServerHelper.redoStart(reActivity, restartConnection, recomputer, remanagerBinder);
+    }
+
     @Override
     public boolean onContextItemSelected(MenuItem item) {
         AdapterContextMenuInfo info = (AdapterContextMenuInfo) item.getMenuInfo();
         final AppObject app = (AppObject) appGridAdapter.getItem(info.position);
+        restartConnection = app.app;
+        reActivity = AppView.this;
         switch (item.getItemId()) {
             case START_WITH_QUIT:
                 // Display a confirmation dialog first
@@ -448,6 +487,7 @@ public class AppView extends Activity implements AdapterFragmentCallbacks {
             case START_OR_RESUME_ID:
                 // Resume is the same as start for us
                 ServerHelper.doStart(AppView.this, app.app, computer, managerBinder);
+                System.out.println(app.app);
                 return true;
 
             case QUIT_ID:
@@ -620,6 +660,7 @@ public class AppView extends Activity implements AdapterFragmentCallbacks {
 
     @Override
     public void receiveAbsListView(AbsListView listView) {
+
         listView.setAdapter(appGridAdapter);
         listView.setOnItemClickListener(new OnItemClickListener() {
             @Override
@@ -631,6 +672,8 @@ public class AppView extends Activity implements AdapterFragmentCallbacks {
                 if (lastRunningAppId != 0) {
                     openContextMenu(arg1);
                 } else {
+                    restartConnection = app.app;
+                    reActivity = AppView.this;
                     ServerHelper.doStart(AppView.this, app.app, computer, managerBinder);
                 }
             }

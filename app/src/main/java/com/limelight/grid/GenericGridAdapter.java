@@ -54,7 +54,8 @@ public abstract class GenericGridAdapter<T> extends BaseAdapter {
         return i;
     }
 
-    public abstract void populateView(View parentView, ImageView imgView, ProgressBar prgView, TextView txtView, ImageView overlayView, T obj);
+    public abstract void populateView(View parentView, ImageView imgView, ProgressBar prgView,
+                                      TextView txtView, ImageView overlayView, T obj);
 
     @Override
     public View getView(int i, View convertView, ViewGroup viewGroup) {

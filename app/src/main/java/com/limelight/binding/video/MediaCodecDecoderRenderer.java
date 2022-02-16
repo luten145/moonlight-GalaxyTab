@@ -1,12 +1,15 @@
 package com.limelight.binding.video;
 
 import java.nio.ByteBuffer;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.Locale;
 
 import org.jcodec.codecs.h264.H264Utils;
 import org.jcodec.codecs.h264.io.model.SeqParameterSet;
 import org.jcodec.codecs.h264.io.model.VUIParameters;
 
+import com.limelight.Game;
 import com.limelight.LimeLog;
 import com.limelight.R;
 import com.limelight.nvstream.av.video.VideoDecoderRenderer;
@@ -87,6 +90,7 @@ public class MediaCodecDecoderRenderer extends VideoDecoderRenderer {
     private int numFramesIn;
     private int numFramesOut;
 
+    //AVC 디코더 찾기
     private MediaCodecInfo findAvcDecoder() {
         MediaCodecInfo decoder = MediaCodecHelper.findProbableSafeDecoder("video/avc", MediaCodecInfo.CodecProfileLevel.AVCProfileHigh);
         if (decoder == null) {
@@ -95,6 +99,7 @@ public class MediaCodecDecoderRenderer extends VideoDecoderRenderer {
         return decoder;
     }
 
+    //HVEC 디코더 찾기
     private MediaCodecInfo findHevcDecoder(PreferenceConfiguration prefs, boolean meteredNetwork, boolean requestedHdr) {
         // Don't return anything if HEVC is forced off
         if (prefs.videoFormat == PreferenceConfiguration.FORCE_H265_OFF) {
@@ -122,7 +127,7 @@ public class MediaCodecDecoderRenderer extends VideoDecoderRenderer {
                 }
             }
         }
-
+        //디코더 정보 전송
         return decoderInfo;
     }
 
@@ -417,18 +422,24 @@ public class MediaCodecDecoderRenderer extends VideoDecoderRenderer {
             }
         }
     }
-
+    
     private void startRendererThread()
     {
+
         rendererThread = new Thread() {
             @Override
             public void run() {
                 BufferInfo info = new BufferInfo();
                 while (!stopping) {
                     try {
+
                         // Try to output a frame
+                        //렌더링 정보 가져옴
                         int outIndex = videoDecoder.dequeueOutputBuffer(info, 50000);
+                        //렌더링 여부 결정
                         if (outIndex >= 0) {
+                            //한 프레임이 여기서 나가는데 이걸 많이 해야 아웃인덱스가 줄어들지
+
                             long presentationTimeUs = info.presentationTimeUs;
                             int lastIndex = outIndex;
 
@@ -458,10 +469,11 @@ public class MediaCodecDecoderRenderer extends VideoDecoderRenderer {
                                 }
                             }
                             else {
-                                videoDecoder.releaseOutputBuffer(lastIndex, true);
+
                             }
 
                             activeWindowVideoStats.totalFramesRendered++;
+
 
                             // Add delta time to the totals (excluding probable outliers)
                             long delta = MediaCodecHelper.getMonotonicMillis() - (presentationTimeUs / 1000);
@@ -533,8 +545,10 @@ public class MediaCodecDecoderRenderer extends VideoDecoderRenderer {
         return index;
     }
 
+    public static float updatehz;
     @Override
     public void start() {
+
         startRendererThread();
     }
 
@@ -563,11 +577,6 @@ public class MediaCodecDecoderRenderer extends VideoDecoderRenderer {
     @Override
     public void cleanup() {
         videoDecoder.release();
-    }
-
-    @Override
-    public void setHdrMode(boolean enabled) {
-        // TODO: Set HDR metadata?
     }
 
     private boolean queueInputBuffer(int inputBufferIndex, int offset, int length, long timestampUs, int codecFlags) {
@@ -622,10 +631,14 @@ public class MediaCodecDecoderRenderer extends VideoDecoderRenderer {
         }
     }
 
+
+
     @SuppressWarnings("deprecation")
     @Override
     public int submitDecodeUnit(byte[] decodeUnitData, int decodeUnitLength, int decodeUnitType,
                                 int frameNumber, long receiveTimeMs, long enqueueTimeMs) {
+
+
         if (stopping) {
             // Don't bother if we're stopping
             return MoonBridge.DR_OK;
@@ -650,31 +663,36 @@ public class MediaCodecDecoderRenderer extends VideoDecoderRenderer {
                 lastTwo.add(lastWindowVideoStats);
                 lastTwo.add(activeWindowVideoStats);
                 VideoStatsFps fps = lastTwo.getFps();
-                String decoder;
 
-                if ((videoFormat & MoonBridge.VIDEO_FORMAT_MASK_H264) != 0) {
-                    decoder = avcDecoder.getName();
-                } else if ((videoFormat & MoonBridge.VIDEO_FORMAT_MASK_H265) != 0) {
-                    decoder = hevcDecoder.getName();
-                } else {
-                    decoder = "(unknown)";
+                if (0 != 0) {
+
+                    String decoder;
+
+                    if ((videoFormat & MoonBridge.VIDEO_FORMAT_MASK_H264) != 0) {
+                        decoder = avcDecoder.getName();
+                    } else if ((videoFormat & MoonBridge.VIDEO_FORMAT_MASK_H265) != 0) {
+                        decoder = hevcDecoder.getName();
+                    } else {
+                        decoder = "(unknown)";
+                    }
+
                 }
 
-                float decodeTimeMs = (float)lastTwo.decoderTimeMs / lastTwo.totalFramesReceived;
+                float decodeTimeMs = (float)lastTwo.decoderTimeMs/lastTwo.totalFramesReceived;
                 long rttInfo = MoonBridge.getEstimatedRttInfo();
-                StringBuilder sb = new StringBuilder();
-                sb.append(context.getString(R.string.perf_overlay_streamdetails, initialWidth + "x" + initialHeight, fps.totalFps)).append('\n');
-                sb.append(context.getString(R.string.perf_overlay_decoder, decoder)).append('\n');
-                sb.append(context.getString(R.string.perf_overlay_incomingfps, fps.receivedFps)).append('\n');
-                sb.append(context.getString(R.string.perf_overlay_renderingfps, fps.renderedFps)).append('\n');
-                sb.append(context.getString(R.string.perf_overlay_netdrops,
-                        (float)lastTwo.framesLost / lastTwo.totalFrames * 100)).append('\n');
-                sb.append(context.getString(R.string.perf_overlay_netlatency,
-                        (int)(rttInfo >> 32), (int)rttInfo)).append('\n');
-                sb.append(context.getString(R.string.perf_overlay_dectime, decodeTimeMs));
-                perfListener.onPerfUpdate(sb.toString());
-            }
 
+                int resolutionWidth = initialWidth;
+                int resolutionHeight = initialHeight;
+                short totalFps = (short) lastTwo.getFps().totalFps;
+                short receivedFps = (short) fps.receivedFps;
+                short renderedFps = (short) fps.renderedFps;
+                int ping = (int)(rttInfo >> 32);
+                int variance = (int)rttInfo;
+                short decodeTime = (short) decodeTimeMs;
+                float packetLossPercentage = (lastTwo.framesLost / lastTwo.totalFrames * 100);
+                perfListener.onPerfUpdate(resolutionWidth,resolutionHeight,totalFps,receivedFps,
+                        renderedFps,ping,variance,decodeTime,packetLossPercentage);
+            }
             globalVideoStats.add(activeWindowVideoStats);
             lastWindowVideoStats.copy(activeWindowVideoStats);
             activeWindowVideoStats.clear();
@@ -943,6 +961,7 @@ public class MediaCodecDecoderRenderer extends VideoDecoderRenderer {
                 LimeLog.info("SPS replay complete");
             }
         }
+
 
         return MoonBridge.DR_OK;
     }

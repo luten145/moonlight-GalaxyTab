@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    //다크
+    <color name="Primary">#000000</color>
+    <color name="PrimaryVariant">#3700B3</color>
+    <color name="Secondary">#ffffff</color>
+    <color name="SecondaryVariant">#018786</color>
+
+    <color name="Surface">#FFFFFF</color>
+    <color name="Error">#B00020</color>
+    <color name="OnPrimary">#FFFFFF</color>
+    <color name="OnSecondary">#000000</color>
+    <color name="OnBackground">#000000</color>
+    <color name="OnSurface">#000000</color>
+    <color name="OnError">#FFFFFF</color>
+
+    <color name="Background">#000000</color>
+
+    <color name="Background1">#252525</color>
+    <color name="Background2">#252525</color>
+
+    <color name="textColor">#FFFFFF</color>
+    <color name="contextColor">#121212</color>
+</resources>

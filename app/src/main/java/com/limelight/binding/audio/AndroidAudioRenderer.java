@@ -68,18 +68,26 @@ public class AndroidAudioRenderer implements AudioRenderer {
         int channelConfig;
         int bytesPerFrame;
 
+
+
+
+
         switch (audioConfiguration.channelCount)
         {
             case 2:
-                channelConfig = AudioFormat.CHANNEL_OUT_STEREO;
+                channelConfig = AudioFormat.CHANNEL_OUT_QUAD;
+                System.out.println("2채널이니?");
                 break;
             case 4:
+                System.out.println("4채널이니?");
                 channelConfig = AudioFormat.CHANNEL_OUT_QUAD;
                 break;
             case 6:
+                System.out.println("6채널이니?");
                 channelConfig = AudioFormat.CHANNEL_OUT_5POINT1;
                 break;
             case 8:
+                System.out.println("8채널이니?");
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
                     // AudioFormat.CHANNEL_OUT_7POINT1_SURROUND isn't available until Android 6.0,
                     // yet the CHANNEL_OUT_SIDE_LEFT and CHANNEL_OUT_SIDE_RIGHT constants were added
@@ -102,7 +110,7 @@ public class AndroidAudioRenderer implements AudioRenderer {
 
         LimeLog.info("Audio channel config: "+String.format("0x%X", channelConfig));
 
-        bytesPerFrame = audioConfiguration.channelCount * samplesPerFrame * 2;
+        bytesPerFrame = audioConfiguration.channelCount * samplesPerFrame *2 ;
 
         // We're not supposed to request less than the minimum
         // buffer size for our buffer, but it appears that we can

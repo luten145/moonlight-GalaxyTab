@@ -2,93 +2,51 @@ package com.limelight.binding.input.capture;
 
 import android.annotation.TargetApi;
 import android.app.Activity;
-import android.hardware.input.InputManager;
+import android.content.Context;
 import android.os.Build;
-import android.os.Handler;
 import android.view.InputDevice;
 import android.view.MotionEvent;
+import android.view.PointerIcon;
 import android.view.View;
+
+import com.limelight.Game;
 
 
 // We extend AndroidPointerIconCaptureProvider because we want to also get the
 // pointer icon hiding behavior over our stream view just in case pointer capture
 // is unavailable on this system (ex: DeX, ChromeOS)
 @TargetApi(Build.VERSION_CODES.O)
-public class AndroidNativePointerCaptureProvider extends AndroidPointerIconCaptureProvider implements InputManager.InputDeviceListener {
-    private InputManager inputManager;
+public class AndroidNativePointerCaptureProvider extends AndroidPointerIconCaptureProvider {
     private View targetView;
+    private Context context;
 
     public AndroidNativePointerCaptureProvider(Activity activity, View targetView) {
         super(activity, targetView);
-        this.inputManager = activity.getSystemService(InputManager.class);
         this.targetView = targetView;
+        this.context = activity;
     }
 
     public static boolean isCaptureProviderSupported() {
         return Build.VERSION.SDK_INT >= Build.VERSION_CODES.O;
     }
 
-    // We only capture the pointer if we have a compatible InputDevice
-    // present. This is a workaround for an Android 12 regression causing
-    // incorrect mouse input when using the SPen.
-    // https://github.com/moonlight-stream/moonlight-android/issues/1030
-    private boolean hasCaptureCompatibleInputDevice() {
-        for (int id : InputDevice.getDeviceIds()) {
-            InputDevice device = InputDevice.getDevice(id);
-            if (device == null) {
-                continue;
-            }
-
-            if (device.supportsSource(InputDevice.SOURCE_MOUSE) ||
-                    device.supportsSource(InputDevice.SOURCE_MOUSE_RELATIVE) ||
-                    device.supportsSource(InputDevice.SOURCE_TOUCHPAD)) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
     @Override
     public void enableCapture() {
         super.enableCapture();
-
-        // Listen for device events to enable/disable capture
-        inputManager.registerInputDeviceListener(this, null);
-
-        // Capture now if we have a capture-capable device
-        if (hasCaptureCompatibleInputDevice()) {
-            targetView.requestPointerCapture();
-        }
+        targetView.requestPointerCapture();
     }
 
     @Override
     public void disableCapture() {
         super.disableCapture();
-        inputManager.unregisterInputDeviceListener(this);
         targetView.releasePointerCapture();
     }
 
-    @Override
-    public void onWindowFocusChanged(boolean focusActive) {
-        if (!focusActive || !isCapturing) {
-            return;
-        }
-
-        // Recapture the pointer if focus was regained. On Android Q,
-        // we have to delay a bit before requesting capture because otherwise
-        // we'll hit the "requestPointerCapture called for a window that has no focus"
-        // error and it will not actually capture the cursor.
-        Handler h = new Handler();
-        h.postDelayed(new Runnable() {
-            @Override
-            public void run() {
-                if (hasCaptureCompatibleInputDevice()) {
-                    targetView.requestPointerCapture();
-                }
-            }
-        }, 500);
-    }
+    public int switchX ;
+    public int switchRELATIVEX ;
+    public int switchY ;
+    public int switchRELATIVEY ;
+    public float reversalRELATIVEY;
 
     @Override
     public boolean eventHasRelativeMouseAxes(MotionEvent event) {
@@ -96,56 +54,60 @@ public class AndroidNativePointerCaptureProvider extends AndroidPointerIconCaptu
         // SOURCE_TOUCHPAD will have relative axes populated iff our view has pointer capture.
         // See https://developer.android.com/reference/android/view/View#requestPointerCapture()
         int eventSource = event.getSource();
-        return (eventSource == InputDevice.SOURCE_MOUSE_RELATIVE && event.getToolType(0) == MotionEvent.TOOL_TYPE_MOUSE) ||
+        return eventSource == InputDevice.SOURCE_MOUSE_RELATIVE ||
                 (eventSource == InputDevice.SOURCE_TOUCHPAD && targetView.hasPointerCapture());
     }
 
     @Override
     public float getRelativeAxisX(MotionEvent event) {
+        if (event.getToolType(0) == MotionEvent.TOOL_TYPE_STYLUS){
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ) {
+                targetView.releasePointerCapture();
+                targetView.setPointerIcon(PointerIcon.getSystemIcon(context, PointerIcon.TYPE_ARROW));
+            }
+        }
+
+        if (event.getSource() == 1048584){
+            switchX = MotionEvent.AXIS_Y ;
+            switchRELATIVEX = MotionEvent.AXIS_RELATIVE_Y;
+        }
+        else {
+            switchX = MotionEvent.AXIS_X ;
+            switchRELATIVEX = MotionEvent.AXIS_RELATIVE_X;
+        }
         int axis = (event.getSource() == InputDevice.SOURCE_MOUSE_RELATIVE) ?
-                MotionEvent.AXIS_X : MotionEvent.AXIS_RELATIVE_X;
+                switchX : switchRELATIVEX ;
         float x = event.getAxisValue(axis);
         for (int i = 0; i < event.getHistorySize(); i++) {
             x += event.getHistoricalAxisValue(axis, i);
         }
+
         return x;
     }
 
     @Override
     public float getRelativeAxisY(MotionEvent event) {
-        int axis = (event.getSource() == InputDevice.SOURCE_MOUSE_RELATIVE) ?
-                MotionEvent.AXIS_Y : MotionEvent.AXIS_RELATIVE_Y;
-        float y = event.getAxisValue(axis);
+        if (event.getToolType(0) == 2 ){
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ) {
+                targetView.releasePointerCapture();
+            }
+        }
+
+        if (event.getSource() == 1048584){
+            switchY = MotionEvent.AXIS_X ;
+            switchRELATIVEY = MotionEvent.AXIS_RELATIVE_X;
+            reversalRELATIVEY = -event.getAxisValue(switchRELATIVEY);
+        }
+        else {
+            switchY = MotionEvent.AXIS_Y ;
+            switchRELATIVEY = MotionEvent.AXIS_RELATIVE_Y;
+            reversalRELATIVEY = event.getAxisValue(switchRELATIVEY);
+        }
+        int axis = (event.getSource() == InputDevice.SOURCE_MOUSE_RELATIVE) ? switchY : switchRELATIVEY;
+        float y = reversalRELATIVEY;
         for (int i = 0; i < event.getHistorySize(); i++) {
             y += event.getHistoricalAxisValue(axis, i);
         }
         return y;
-    }
-
-    @Override
-    public void onInputDeviceAdded(int deviceId) {
-        // Check if we've added a capture-compatible device
-        if (!targetView.hasPointerCapture() && hasCaptureCompatibleInputDevice()) {
-            targetView.requestPointerCapture();
-        }
-    }
-
-    @Override
-    public void onInputDeviceRemoved(int deviceId) {
-        // Check if the capture-compatible device was removed
-        if (targetView.hasPointerCapture() && !hasCaptureCompatibleInputDevice()) {
-            targetView.releasePointerCapture();
-        }
-    }
-
-    @Override
-    public void onInputDeviceChanged(int deviceId) {
-        // Emulating a remove+add should be sufficient for our purposes.
-        //
-        // Note: This callback must be handled carefully because it can happen as a result of
-        // calling requestPointerCapture(). This can cause trackpad devices to gain SOURCE_MOUSE_RELATIVE
-        // and re-enter this callback.
-        onInputDeviceRemoved(deviceId);
-        onInputDeviceAdded(deviceId);
     }
 }

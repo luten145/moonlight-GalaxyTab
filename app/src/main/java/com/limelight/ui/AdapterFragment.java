@@ -24,6 +24,7 @@ public class AdapterFragment extends Fragment {
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
+        System.out.println("CODEFLAG_SUB_A");
         return inflater.inflate(callbacks.getAdapterFragmentLayoutId(), container, false);
     }
 

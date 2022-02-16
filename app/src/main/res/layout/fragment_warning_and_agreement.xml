@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:context=".Warning_and_agreement"
+    android:id="@+id/fragmentView">
+
+
+
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical">
+
+        <LinearLayout
+            android:id="@+id/fragmenttest"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_gravity="center"
+            android:background="@drawable/ic_pc_backguornd"
+            android:orientation="vertical"
+            android:layout_marginVertical="10dp"
+            android:layout_weight="1">
+            <TextView android:id="@+id/pcViewSpace" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_gravity="center" android:layout_marginHorizontal="10dp" android:layout_marginTop="50dp" android:background="@drawable/ic_pc_backguornd" android:gravity="center" android:text="경고" android:textColor="@color/textColor" android:textSize="50dp"> </TextView>
+            <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_gravity="center" android:layout_marginHorizontal="10dp" android:layout_marginTop="50dp" android:background="@drawable/ic_pc_backguornd" android:gravity="center" android:text="이 버전은 moonlight의 개조버전입니다. 따라서 이 버전은 공식버전이 아닙니다." android:textColor="@color/textColor" android:textSize="20dp"> </TextView>
+            <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_gravity="center" android:layout_marginHorizontal="10dp" android:layout_marginTop="50dp" android:background="@drawable/ic_pc_backguornd" android:gravity="center" android:text=" 1.제작자는 정상적인 동작에 대한 보증을 하지 않습니다." android:textColor="@color/textColor" android:textSize="20dp"> </TextView>
+            <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_gravity="center" android:layout_marginHorizontal="10dp" android:layout_marginTop="5dp" android:background="@drawable/ic_pc_backguornd" android:gravity="center" android:text="따라서 이 버전을 사용함으로 인해 생기는 모든 문제 및 피해(기기손상,데이터 손실 등)에 대한 책임은 사용자 본인에게 있습니다." android:textColor="@color/textColor" android:textSize="20dp"> </TextView>
+            <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_gravity="center" android:layout_marginHorizontal="10dp" android:layout_marginTop="50dp" android:background="@drawable/ic_pc_backguornd" android:gravity="center" android:text="2.이 버전은 공식 Moonlight와 전혀 관련이 없습니다." android:textColor="@color/textColor" android:textSize="20dp"> </TextView>
+            <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_gravity="center" android:layout_marginHorizontal="10dp" android:layout_marginTop="5dp" android:background="@drawable/ic_pc_backguornd" android:gravity="center" android:text="따라서 이 버전에 대한 모든것을 공식 Moonlight 채널에 언급하여서는 안됩니다." android:textColor="@color/textColor" android:textSize="20dp"> </TextView>
+            <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_gravity="center" android:layout_marginHorizontal="10dp" android:layout_marginTop="5dp" android:background="@drawable/ic_pc_backguornd" android:gravity="center" android:text="공식 Moonlight 채널에서도 이 버전에 대해 전혀 관여하지 않기 때문에" android:textColor="@color/textColor" android:textSize="20dp"> </TextView>
+            <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_gravity="center" android:layout_marginHorizontal="10dp" android:layout_marginTop="5dp" android:background="@drawable/ic_pc_backguornd" android:gravity="center" android:text="공식채널에서도 이 버전에 대한 내용이 언급되기를 원하지 않을것입니다." android:textColor="@color/textColor" android:textSize="20dp"> </TextView>
+            <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_gravity="center" android:layout_marginHorizontal="10dp" android:layout_marginTop="50dp" android:background="@drawable/ic_pc_backguornd" android:gravity="center" android:text="본 버전은 GPL라이선스 3.0을 따르고 있으며 라이선스 조건에 따라 https://github.com/luten145/moonlight-android 에서 소스코드를 제공받을 수 있습니다." android:textColor="@color/textColor" android:textSize="20dp"> </TextView>
+
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="50dp"
+            android:orientation="horizontal"
+            android:layout_gravity="end">
+
+            <Button
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:text="거부"
+                android:layout_weight="1"
+                android:gravity="center"
+                android:textSize="20dp"
+                android:background="@color/Background2">
+            </Button>
+
+            <Button
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:text="동의"
+                android:layout_weight="1"
+                android:gravity="center"
+                android:textSize="20dp"
+                android:background="@color/Background2">
+            </Button>
+
+
+
+        </LinearLayout>
+
+
+
+    </LinearLayout>
+
+
+</FrameLayout>

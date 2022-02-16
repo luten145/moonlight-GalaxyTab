@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="app_label" translatable="false">Moonlight</string>
+    <string name="app_label_root" translatable="false">Moonlight (Root)</string>
     <!-- Shortcut strings -->
     <string name="scut_deleted_pc">Host gelöscht</string>
     <string name="scut_not_paired">Host nicht gekoppelt</string>
@@ -218,9 +220,4 @@
     <string name="pcview_menu_header_unknown">Aktualisiere</string>
     <string name="pcview_menu_header_offline">Offline</string>
     <string name="pcview_menu_header_online">Online</string>
-
-    <!-- Array strings -->
-    <string name="videoformat_hevcauto">Verwende HEVC so fern stabile Unterstützung vorhanden ist</string>
-    <string name="videoformat_hevcalways">Immer HEVC verwenden (könnte Crashes verursachen)</string>
-    <string name="videoformat_hevcnever">Nie HEVC verwenden</string>
 </resources>

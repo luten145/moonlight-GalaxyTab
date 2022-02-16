@@ -38,7 +38,7 @@ public class KeyboardTranslator {
     public static final int VK_SEMICOLON = 59;
     public static final int VK_SLASH = 47;
     public static final int VK_SPACE = 32;
-    public static final int VK_PRINTSCREEN = 154;
+    public static final int VK_PRINTSCREEN = 44;
     public static final int VK_TAB = 9;
     public static final int VK_LEFT = 37;
     public static final int VK_RIGHT = 39;
@@ -95,7 +95,7 @@ public class KeyboardTranslator {
                 translated = 0xA4;
                 break;
 
-            case KeyEvent.KEYCODE_ALT_RIGHT:
+                case KeyEvent.KEYCODE_ALT_RIGHT:
                 translated = 0xA5;
                 break;
                 
@@ -115,7 +115,7 @@ public class KeyboardTranslator {
                 translated = 0xbc;
                 break;
                 
-            case KeyEvent.KEYCODE_CTRL_LEFT:
+                case KeyEvent.KEYCODE_CTRL_LEFT:
                 translated = 0xA2;
                 break;
 
@@ -153,7 +153,7 @@ public class KeyboardTranslator {
                 break;
 
             case KeyEvent.KEYCODE_META_LEFT:
-                translated = 0x5b;
+                translated = 0x5B;
                 break;
 
             case KeyEvent.KEYCODE_META_RIGHT:
@@ -216,12 +216,12 @@ public class KeyboardTranslator {
                 translated = VK_SPACE;
                 break;
                 
-            case KeyEvent.KEYCODE_SYSRQ:
+                case KeyEvent.KEYCODE_SYSRQ:
                 // Android defines this as SysRq/PrntScrn
                 translated = VK_PRINTSCREEN;
                 break;
                 
-            case KeyEvent.KEYCODE_TAB:
+                case KeyEvent.KEYCODE_TAB:
                 translated = VK_TAB;
                 break;
                 
@@ -284,6 +284,32 @@ public class KeyboardTranslator {
             case KeyEvent.KEYCODE_STAR:
                 translated = 8 + VK_0;
                 break;
+
+                case KeyEvent.KEYCODE_LANGUAGE_SWITCH:
+                    translated = 0xA5;
+                    break;
+
+                case KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE:
+                    translated = 0xB3;
+                    break;
+                case KeyEvent.KEYCODE_MEDIA_PREVIOUS:
+                    translated = 0xB1;
+                    break;
+                case KeyEvent.KEYCODE_MEDIA_NEXT:
+                    translated = 0xB0;
+                    break;
+                case 1002://fn+f1
+                    translated = 0xB6;
+                    break;
+                case 187://fn+f2
+                    translated = 0xAC;
+                    break;
+                case 3://fn+f3
+                    translated = 0xB7;
+                    break;
+                case 176://fn+f13
+                    translated = 0xB7;
+                    break;
 
             default:
                 System.out.println("No key for "+keycode);

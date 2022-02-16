@@ -1,5 +1,7 @@
 package com.limelight.nvstream.jni;
 
+import android.os.SystemClock;
+
 import com.limelight.nvstream.NvConnectionListener;
 import com.limelight.nvstream.av.audio.AudioRenderer;
 import com.limelight.nvstream.av.video.VideoDecoderRenderer;
@@ -136,6 +138,7 @@ public class MoonBridge {
     }
 
     public static void bridgeDrStart() {
+
         if (videoRenderer != null) {
             videoRenderer.start();
         }
@@ -153,9 +156,12 @@ public class MoonBridge {
         }
     }
 
+
     public static int bridgeDrSubmitDecodeUnit(byte[] decodeUnitData, int decodeUnitLength,
                                                int decodeUnitType, int frameNumber,
                                                long receiveTimeMs, long enqueueTimeMs) {
+
+
         if (videoRenderer != null) {
             return videoRenderer.submitDecodeUnit(decodeUnitData, decodeUnitLength,
                     decodeUnitType, frameNumber, receiveTimeMs, enqueueTimeMs);
@@ -237,12 +243,6 @@ public class MoonBridge {
     public static void bridgeClConnectionStatusUpdate(int connectionStatus) {
         if (connectionListener != null) {
             connectionListener.connectionStatusUpdate(connectionStatus);
-        }
-    }
-
-    public static void bridgeClSetHdrMode(boolean enabled) {
-        if (connectionListener != null) {
-            connectionListener.setHdrMode(enabled);
         }
     }
 

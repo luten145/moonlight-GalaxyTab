@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_label" translatable="false">Moonlight</string>
+    <string name="app_label" translatable="false">Moonlight for Galaxy Tab</string>
     <string name="app_label_root" translatable="false">Moonlight (Root)</string>
 
     <!-- Shortcut strings -->
@@ -226,25 +226,16 @@
     <string name="summary_enable_perf_overlay">Display real-time stream performance information while streaming</string>
     <string name="title_enable_post_stream_toast">Show latency message after streaming</string>
     <string name="summary_enable_post_stream_toast">Display a latency information message after the stream ends</string>
+    <string name="title_activity_main">MainActivity</string>
+    <!-- Strings used for fragments for navigation -->
+    <string name="first_fragment_label">First Fragment</string>
+    <string name="second_fragment_label">Second Fragment</string>
+    <string name="next">Next</string>
+    <string name="previous">Previous</string>
 
-    <!-- Array strings -->
-    <string name="resolution_360p">360p</string>
-    <string name="resolution_480p">480p</string>
-    <string name="resolution_720p">720p</string>
-    <string name="resolution_1080p">1080p</string>
-    <string name="resolution_1440p">1440p</string>
-    <string name="resolution_4k">4K</string>
+    <string name="hello_first_fragment">Hello first fragment</string>
+    <string name="hello_second_fragment">Hello second fragment. Arg: %1$s</string>
+    <!-- TODO: Remove or change this placeholder text -->
+    <string name="hello_blank_fragment">Hello blank fragment</string>
 
-    <string name="fps_30">30 FPS</string>
-    <string name="fps_60">60 FPS</string>
-    <string name="fps_90">90 FPS</string>
-    <string name="fps_120">120 FPS</string>
-
-    <string name="audioconf_stereo">Stereo</string>
-    <string name="audioconf_51surround">5.1 Surround Sound</string>
-    <string name="audioconf_71surround">7.1 Surround Sound</string>
-
-    <string name="videoformat_hevcauto">Use HEVC only if stable</string>
-    <string name="videoformat_hevcalways">Always use HEVC (may crash)</string>
-    <string name="videoformat_hevcnever">Never use HEVC</string>
 </resources>

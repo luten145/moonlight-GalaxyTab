@@ -1,15 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
     package="com.limelight">
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.REORDER_TASKS" />
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
-    <uses-permission android:name="com.android.providers.tv.permission.READ_EPG_DATA"/>
-    <uses-permission android:name="com.android.providers.tv.permission.WRITE_EPG_DATA"/>
+    <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS"
+        tools:ignore="ProtectedPermissions" />
+
 
     <uses-feature
         android:name="android.hardware.touchscreen"
@@ -25,33 +28,31 @@
         android:required="false" />
     <uses-feature
         android:name="android.software.leanback"
-        android:required="false" />
-
-    <!-- Disable legacy input emulation on ChromeOS -->
+        android:required="false" /> <!-- Disable legacy input emulation on ChromeOS -->
     <uses-feature
         android:name="android.hardware.type.pc"
-        android:required="false"/>
+        android:required="false" />
 
     <application
         android:allowBackup="true"
-        android:fullBackupContent="@xml/backup_rules"
-        android:dataExtractionRules="@xml/backup_rules_s"
-        android:networkSecurityConfig="@xml/network_security_config"
-        android:isGame="true"
-        android:banner="@drawable/atv_banner"
         android:appCategory="game"
-        android:icon="@mipmap/ic_launcher"
-        android:roundIcon="@mipmap/ic_launcher"
-        android:installLocation="auto"
+        android:banner="@drawable/atv_banner"
+        android:dataExtractionRules="@xml/backup_rules_s"
+        android:fullBackupContent="@xml/backup_rules"
         android:gwpAsanMode="always"
-        android:theme="@style/AppTheme">
+        android:icon="@drawable/ic_empty"
+        android:installLocation="auto"
+        android:isGame="true"
+        android:networkSecurityConfig="@xml/network_security_config"
+        android:roundIcon="@drawable/ic_empty"
+        android:theme="@style/AppTheme"
+        >
+
         <provider
             android:name=".PosterContentProvider"
             android:authorities="poster.${applicationId}"
             android:enabled="true"
-            android:exported="true">
-        </provider>
-        <!-- Samsung multi-window support -->
+            android:exported="true"></provider> <!-- Samsung multi-window support -->
         <uses-library
             android:name="com.sec.android.app.multiwindow"
             android:required="false" />
@@ -59,15 +60,15 @@
         <meta-data
             android:name="com.sec.android.support.multiwindow"
             android:value="true" />
-
-        <!-- Samsung DeX support requires explicit placement of android:resizeableActivity="true"
-             in each activity even though it is implied by targeting API 24+ -->
-
+        <!--
+ Samsung DeX support requires explicit placement of android:resizeableActivity="true"
+             in each activity even though it is implied by targeting API 24+
+        -->
         <activity
             android:name=".PcView"
+            android:configChanges="mcc|mnc|touchscreen|keyboard|keyboardHidden|navigation|screenLayout|fontScale|uiMode|orientation|screenSize|smallestScreenSize|layoutDirection|uiMode"
             android:exported="true"
-            android:resizeableActivity="true"
-            android:configChanges="mcc|mnc|touchscreen|keyboard|keyboardHidden|navigation|screenLayout|fontScale|uiMode|orientation|screenSize|smallestScreenSize|layoutDirection">
+            android:resizeableActivity="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 
@@ -76,61 +77,61 @@
                 <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
                 <category android:name="tv.ouya.intent.category.APP" />
             </intent-filter>
-        </activity>
-        <!-- Small hack to support launcher shortcuts without relaunching over and over again when the back button is pressed -->
+        </activity> <!-- Small hack to support launcher shortcuts without relaunching over and over again when the back button is pressed -->
         <activity
             android:name=".ShortcutTrampoline"
-            android:noHistory="true"
+            android:configChanges="mcc|mnc|locale|touchscreen|keyboard|keyboardHidden|navigation|screenLayout|fontScale|uiMode|orientation|screenSize|smallestScreenSize|layoutDirection"
             android:exported="true"
-            android:resizeableActivity="true"
-            android:configChanges="mcc|mnc|locale|touchscreen|keyboard|keyboardHidden|navigation|screenLayout|fontScale|uiMode|orientation|screenSize|smallestScreenSize|layoutDirection">
+            android:noHistory="true"
+            android:resizeableActivity="true">
             <meta-data
                 android:name="android.support.PARENT_ACTIVITY"
                 android:value="com.limelight.PcView" />
         </activity>
         <activity
             android:name=".AppView"
-            android:resizeableActivity="true"
-            android:configChanges="mcc|mnc|touchscreen|keyboard|keyboardHidden|navigation|screenLayout|fontScale|uiMode|orientation|screenSize|smallestScreenSize|layoutDirection">
+            android:configChanges="mcc|mnc|touchscreen|keyboard|keyboardHidden|navigation|screenLayout|fontScale|uiMode|orientation|screenSize|smallestScreenSize|layoutDirection"
+            android:resizeableActivity="true">
             <meta-data
                 android:name="android.support.PARENT_ACTIVITY"
                 android:value="com.limelight.PcView" />
         </activity>
         <activity
             android:name=".preferences.StreamSettings"
-            android:resizeableActivity="true"
-            android:label="Streaming Settings">
+            android:label="Streaming Settings"
+            android:resizeableActivity="true">
             <meta-data
                 android:name="android.support.PARENT_ACTIVITY"
                 android:value="com.limelight.PcView" />
         </activity>
         <activity
             android:name=".preferences.AddComputerManually"
+            android:label="Add Computer Manually"
             android:resizeableActivity="true"
-            android:windowSoftInputMode="stateVisible"
-            android:label="Add Computer Manually">
+            android:windowSoftInputMode="stateVisible">
             <meta-data
                 android:name="android.support.PARENT_ACTIVITY"
                 android:value="com.limelight.PcView" />
-        </activity>
-        <!-- This will fall back to sensorLandscape at runtime on Android 4.2 and below -->
+        </activity> <!-- This will fall back to sensorLandscape at runtime on Android 4.2 and below -->
         <activity
             android:name=".Game"
             android:configChanges="mcc|mnc|locale|touchscreen|keyboard|keyboardHidden|navigation|screenLayout|fontScale|uiMode|orientation|screenSize|smallestScreenSize|layoutDirection"
-            android:screenOrientation="userLandscape"
-            android:noHistory="true"
-            android:supportsPictureInPicture="true"
-            android:resizeableActivity="true"
-            android:launchMode="singleTask"
             android:excludeFromRecents="true"
-            android:theme="@style/StreamTheme"
-            android:preferMinimalPostProcessing="true">
+            android:launchMode="singleTask"
+            android:noHistory="true"
+            android:preferMinimalPostProcessing="true"
+            android:resizeableActivity="true"
+            android:screenOrientation="userLandscape"
+            android:supportsPictureInPicture="true"
+            android:theme="@style/StreamTheme">
             <meta-data
                 android:name="android.support.PARENT_ACTIVITY"
                 android:value="com.limelight.AppView" />
 
-            <!-- Special metadata for NVIDIA Shield devices to prevent input buffering
-                 and most importantly, opt out of mouse acceleration while streaming -->
+            <!--
+                 Special metadata for NVIDIA Shield devices to prevent input buffering
+                 and most importantly, opt out of mouse acceleration while streaming
+            -->
             <meta-data
                 android:name="com.nvidia.immediateInput"
                 android:value="true" />
@@ -138,6 +139,8 @@
                 android:name="com.nvidia.rawCursorInput"
                 android:value="true" />
         </activity>
+
+
 
         <service
             android:name=".discovery.DiscoveryService"
@@ -148,11 +151,24 @@
         <service
             android:name=".binding.input.driver.UsbDriverService"
             android:label="Usb Driver Service" />
+        <service
+            android:name=".MyAccessibilityService"
+            android:exported="false"
+            android:label="Moonlight Keyboard Service"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/accessibility_service_config" />
+        </service>
 
         <activity
             android:name=".HelpActivity"
-            android:resizeableActivity="true"
-            android:configChanges="mcc|mnc|touchscreen|keyboard|keyboardHidden|navigation|screenLayout|fontScale|uiMode|orientation|screenSize|smallestScreenSize|layoutDirection">
+            android:configChanges="mcc|mnc|touchscreen|keyboard|keyboardHidden|navigation|screenLayout|fontScale|uiMode|orientation|screenSize|smallestScreenSize|layoutDirection"
+            android:resizeableActivity="true">
             <meta-data
                 android:name="android.support.PARENT_ACTIVITY"
                 android:value="com.limelight.PcView" />

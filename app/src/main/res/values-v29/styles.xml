@@ -1,6 +1,23 @@
 <resources>
-    <style name="AppBaseTheme" parent="android:Theme.Material">
-        <item name="android:navigationBarColor">@android:color/transparent</item>
-        <item name="android:statusBarColor">@android:color/transparent</item>
+
+
+    <style name="AppBaseTheme" parent="Theme.AppCompat.DayNight">
+        <item name="colorPrimary">@color/Primary</item>
+        <item name="colorPrimaryDark">@color/Primary</item>
+        <item name="colorAccent">@color/Secondary</item>
+        <item name="colorBackgroundFloating">@color/Secondary</item>
+
+        //배경색
+        <item name="android:background">@color/Background</item>
+
+
+        <!-- No Title Bar-->
+        <item name="windowActionBar">false</item>
+        <item name="windowNoTitle">true</item>
+
+        //글자색
+
     </style>
+
+
 </resources>

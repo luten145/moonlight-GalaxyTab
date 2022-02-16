@@ -1,8 +1,37 @@
 package com.limelight;
 
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.net.UnknownHostException;
+import android.app.Activity;
+import android.app.ActivityManager;
+import android.app.Service;
+import android.content.ComponentName;
+import android.content.Intent;
+import android.content.ServiceConnection;
+import android.content.SharedPreferences;
+import android.content.res.Configuration;
+import android.opengl.GLSurfaceView;
+import android.os.Build;
+import android.os.Bundle;
+import android.os.IBinder;
+import android.preference.PreferenceManager;
+import android.view.ContextMenu;
+import android.view.ContextMenu.ContextMenuInfo;
+import android.view.Menu;
+import android.view.MenuItem;
+import android.view.View;
+import android.view.View.OnClickListener;
+import android.widget.AbsListView;
+import android.widget.AdapterView;
+import android.widget.AdapterView.AdapterContextMenuInfo;
+import android.widget.AdapterView.OnItemClickListener;
+import android.widget.Button;
+import android.widget.EditText;
+import android.widget.ImageButton;
+import android.widget.ImageView;
+import android.widget.RelativeLayout;
+import android.widget.TextView;
+import android.widget.Toast;
+
+import androidx.appcompat.app.AppCompatActivity;
 
 import com.limelight.binding.PlatformBinding;
 import com.limelight.binding.crypto.AndroidCryptoProvider;
@@ -28,47 +57,45 @@ import com.limelight.utils.ServerHelper;
 import com.limelight.utils.ShortcutHelper;
 import com.limelight.utils.UiHelper;
 
-import android.app.Activity;
-import android.app.ActivityManager;
-import android.app.Service;
-import android.content.ComponentName;
-import android.content.Intent;
-import android.content.ServiceConnection;
-import android.content.res.Configuration;
-import android.opengl.GLSurfaceView;
-import android.os.Build;
-import android.os.Bundle;
-import android.os.IBinder;
-import android.preference.PreferenceManager;
-import android.view.ContextMenu;
-import android.view.Menu;
-import android.view.MenuItem;
-import android.view.View;
-import android.view.ContextMenu.ContextMenuInfo;
-import android.view.View.OnClickListener;
-import android.widget.AbsListView;
-import android.widget.AdapterView;
-import android.widget.AdapterView.OnItemClickListener;
-import android.widget.ImageButton;
-import android.widget.RelativeLayout;
-import android.widget.Toast;
-import android.widget.AdapterView.AdapterContextMenuInfo;
-
 import org.xmlpull.v1.XmlPullParserException;
+
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.net.UnknownHostException;
+import java.util.List;
+import java.util.Timer;
 
 import javax.microedition.khronos.egl.EGLConfig;
 import javax.microedition.khronos.opengles.GL10;
 
-public class PcView extends Activity implements AdapterFragmentCallbacks {
+//1.클래스시작
+public class PcView extends AppCompatActivity implements AdapterFragmentCallbacks {
+
+    //2.변수선언
     private RelativeLayout noPcFoundLayout;
     private PcGridAdapter pcGridAdapter;
     private ShortcutHelper shortcutHelper;
     private ComputerManagerService.ComputerManagerBinder managerBinder;
     private boolean freezeUpdates, runningPolling, inForeground, completeOnCreateCalled;
+
+    private TextView networkTable1;
+    private TextView networktable2;
+    private TextView networktable3;
+
+    //네트워크 모니터 관련 함수
+    public float networkType = 0;
+    private ImageView networkicon;
+    public short mbands = 0;
+
+    //프래그먼트 관련 함수
+    private AppView_Fragment avf;
+
+    //3.서비스 연걸
     private final ServiceConnection serviceConnection = new ServiceConnection() {
         public void onServiceConnected(ComponentName className, IBinder binder) {
             final ComputerManagerService.ComputerManagerBinder localBinder =
-                    ((ComputerManagerService.ComputerManagerBinder)binder);
+                    ((ComputerManagerService.ComputerManagerBinder) binder);
+            System.out.println("CODEFLAG_A");
 
             // Wait in a separate thread to avoid stalling the UI
             new Thread() {
@@ -94,21 +121,33 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
         }
     };
 
+    //기본설정 변경 시 호출함수
     @Override
     public void onConfigurationChanged(Configuration newConfig) {
+        System.out.println("CODEFLAG_B");
         super.onConfigurationChanged(newConfig);
-
-        // Only reinitialize views if completeOnCreate() was called
-        // before this callback. If it was not, completeOnCreate() will
-        // handle initializing views with the config change accounted for.
-        // This is not prone to races because both callbacks are invoked
-        // in the main thread.
         if (completeOnCreateCalled) {
             // Reinitialize views just in case orientation changed
             initializeViews();
+            //mConnectButton = findViewById(R.id.PcvierBac);
+
+            //int currentNightMode = newConfig.uiMode & Configuration.UI_MODE_NIGHT_MASK;
+            //switch (currentNightMode) {
+            //    case Configuration.UI_MODE_NIGHT_NO:
+            //        System.out.println("라이트모드");
+            //        mConnectButton.setBackgroundColor(Color.parseColor("#FFFFFF"));
+            //         break;
+            //    case Configuration.UI_MODE_NIGHT_YES:
+            //         // Night mode is active, we're using dark theme
+            //        System.out.println("다크모드");
+            //       mConnectButton.setBackgroundColor(Color.parseColor("#000000"));
+//
+            //       break;
+            //}
         }
     }
 
+    //변수선언
     private final static int PAIR_ID = 2;
     private final static int UNPAIR_ID = 3;
     private final static int WOL_ID = 4;
@@ -119,26 +158,39 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
     private final static int FULL_APP_LIST_ID = 9;
     private final static int TEST_NETWORK_ID = 10;
 
+    public static boolean buttontest;
+
+    public boolean trigger;
+    public View akak;
+    public Timer titi;
+    public String mhz;
+
+    //뷰 초기화
     private void initializeViews() {
+        System.out.println("CODEFLAG_C");
+        //액티비티시작
         setContentView(R.layout.activity_pc_view);
 
         UiHelper.notifyNewRootView(this);
 
-        // Set default preferences if we've never been run
+        // 처음 실행 시 기본설정으로 하기
         PreferenceManager.setDefaultValues(this, R.xml.preferences, false);
 
-        // Set the correct layout for the PC grid
+        // PC 그리드 설정(알수 없음)
         pcGridAdapter.updateLayoutWithPreferences(this, PreferenceConfiguration.readPreferences(this));
+        System.out.println(PreferenceConfiguration.readPreferences(this));
 
-        // Setup the list view
+        // 버튼 설정
         ImageButton settingsButton = findViewById(R.id.settingsButton);
         ImageButton addComputerButton = findViewById(R.id.manuallyAddPc);
         ImageButton helpButton = findViewById(R.id.helpButton);
 
+        //설정, 도움말, PC추가 버튼 설정
         settingsButton.setOnClickListener(new OnClickListener() {
             @Override
             public void onClick(View v) {
                 startActivity(new Intent(PcView.this, StreamSettings.class));
+                //getSupportFragmentManager().beginTransaction().replace(R.id.fragmenttest, Warning_and_agreement.newInstance(mhz,mhz)).commitAllowingStateLoss();
             }
         });
         addComputerButton.setOnClickListener(new OnClickListener() {
@@ -155,38 +207,36 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
             }
         });
 
-        // Amazon review didn't like the help button because the wiki was not entirely
-        // navigable via the Fire TV remote (though the relevant parts were). Let's hide
-        // it on Fire TV.
-        if (getPackageManager().hasSystemFeature("amazon.hardware.fire_tv")) {
-            helpButton.setVisibility(View.GONE);
-        }
-
-        getFragmentManager().beginTransaction()
-            .replace(R.id.pcFragmentContainer, new AdapterFragment())
-            .commitAllowingStateLoss();
+        //프래그먼트 교체 위치 설정
+        buttontest = false;
+        getFragmentManager().beginTransaction().replace(R.id.pcFragmentContainer, new AdapterFragment()).commitAllowingStateLoss();
 
         noPcFoundLayout = findViewById(R.id.no_pc_found_layout);
         if (pcGridAdapter.getCount() == 0) {
             noPcFoundLayout.setVisibility(View.VISIBLE);
-        }
-        else {
+        } else {
             noPcFoundLayout.setVisibility(View.INVISIBLE);
         }
         pcGridAdapter.notifyDataSetChanged();
+
+        getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
     }
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        System.out.println("CODEFLAG_D");
 
         // Assume we're in the foreground when created to avoid a race
         // between binding to CMS and onResume()
         inForeground = true;
 
+        //렌더러 설정기
         // Create a GLSurfaceView to fetch GLRenderer unless we have
         // a cached result already.
         final GlPreferences glPrefs = GlPreferences.readPreferences(this);
+        //gl 렌더러가 저장한 값과 다르거나 비어있을때
         if (!glPrefs.savedFingerprint.equals(Build.FINGERPRINT) || glPrefs.glRenderer.isEmpty()) {
             GLSurfaceView surfaceView = new GLSurfaceView(this);
             surfaceView.setRenderer(new GLSurfaceView.Renderer() {
@@ -196,7 +246,6 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
                     glPrefs.glRenderer = gl10.glGetString(GL10.GL_RENDERER);
                     glPrefs.savedFingerprint = Build.FINGERPRINT;
                     glPrefs.writePreferences();
-
                     LimeLog.info("Fetched GL Renderer: " + glPrefs.glRenderer);
 
                     runOnUiThread(new Runnable() {
@@ -216,30 +265,42 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
                 }
             });
             setContentView(surfaceView);
-        }
-        else {
+        } else {
+            //gl렌더러가 그대로일때
             LimeLog.info("Cached GL Renderer: " + glPrefs.glRenderer);
             completeOnCreate();
         }
+
+        networkTable1 = findViewById(R.id.network_table_1);
+        networktable2 = findViewById(R.id.network_table_2);
+        networktable3 = findViewById(R.id.network_table_3);
+        networkicon = findViewById(R.id.network_ic);
     }
 
     private void completeOnCreate() {
+        System.out.println("CODEFLAG_I");
         completeOnCreateCalled = true;
 
+        //바로가기 만들기
         shortcutHelper = new ShortcutHelper(this);
 
+        //언어설정
         UiHelper.setLocale(this);
 
         // Bind to the computer manager service
-        bindService(new Intent(PcView.this, ComputerManagerService.class), serviceConnection,
-                Service.BIND_AUTO_CREATE);
+        bindService(new Intent(PcView.this, ComputerManagerService.class),
+                serviceConnection, Service.BIND_AUTO_CREATE);
 
         pcGridAdapter = new PcGridAdapter(this, PreferenceConfiguration.readPreferences(this));
+
+
 
         initializeViews();
     }
 
     private void startComputerUpdates() {
+        System.out.println("CODEFLAG_J");
+
         // Only allow polling to start if we're bound to CMS, polling is not already running,
         // and our activity is in the foreground.
         if (managerBinder != null && !runningPolling && inForeground) {
@@ -262,6 +323,7 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
     }
 
     private void stopComputerUpdates(boolean wait) {
+        System.out.println("CODEFLAG_K");
         if (managerBinder != null) {
             if (!runningPolling) {
                 return;
@@ -279,8 +341,13 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
         }
     }
 
+    public void appViewFragmentInitialization(){
+        startComputerUpdates();
+    }
+
     @Override
     public void onDestroy() {
+        System.out.println("CODEFLAG_L");
         super.onDestroy();
 
         if (managerBinder != null) {
@@ -290,6 +357,7 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
 
     @Override
     protected void onResume() {
+        System.out.println("CODEFLAG_M");
         super.onResume();
 
         // Display a decoder crash notification if we've returned after a crash
@@ -301,6 +369,7 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
 
     @Override
     protected void onPause() {
+        System.out.println("CODEFLAG_N");
         super.onPause();
 
         inForeground = false;
@@ -309,6 +378,7 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
 
     @Override
     protected void onStop() {
+        System.out.println("CODEFLAG_O");
         super.onStop();
 
         Dialog.closeDialogs();
@@ -316,6 +386,7 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
 
     @Override
     public void onCreateContextMenu(ContextMenu menu, View v, ContextMenuInfo menuInfo) {
+        System.out.println("CODEFLAG_P");
         stopComputerUpdates(false);
 
         // Call superclass
@@ -367,6 +438,7 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
 
     @Override
     public void onContextMenuClosed(Menu menu) {
+        System.out.println("CODEFLAG_Q");
         // For some reason, this gets called again _after_ onPause() is called on this activity.
         // startComputerUpdates() manages this and won't actual start polling until the activity
         // returns to the foreground.
@@ -374,6 +446,7 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
     }
 
     private void doPair(final ComputerDetails computer) {
+        System.out.println("CODEFLAG_R");
         if (computer.state == ComputerDetails.State.OFFLINE ||
                 ServerHelper.getCurrentAddressFromComputer(computer) == null) {
             Toast.makeText(PcView.this, getResources().getString(R.string.pair_pc_offline), Toast.LENGTH_SHORT).show();
@@ -479,6 +552,7 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
     }
 
     private void doWakeOnLan(final ComputerDetails computer) {
+        System.out.println("CODEFLAG_S");
         if (computer.state == ComputerDetails.State.ONLINE) {
             Toast.makeText(PcView.this, getResources().getString(R.string.wol_pc_online), Toast.LENGTH_SHORT).show();
             return;
@@ -512,6 +586,7 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
     }
 
     private void doUnpair(final ComputerDetails computer) {
+        System.out.println("CODEFLAG_T");
         if (computer.state == ComputerDetails.State.OFFLINE ||
                 ServerHelper.getCurrentAddressFromComputer(computer) == null) {
             Toast.makeText(PcView.this, getResources().getString(R.string.error_pc_offline), Toast.LENGTH_SHORT).show();
@@ -566,6 +641,7 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
     }
 
     private void doAppList(ComputerDetails computer, boolean newlyPaired, boolean showHiddenGames) {
+        System.out.println("CODEFLAG_U");
         if (computer.state == ComputerDetails.State.OFFLINE) {
             Toast.makeText(PcView.this, getResources().getString(R.string.error_pc_offline), Toast.LENGTH_SHORT).show();
             return;
@@ -581,10 +657,24 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
         i.putExtra(AppView.NEW_PAIR_EXTRA, newlyPaired);
         i.putExtra(AppView.SHOW_HIDDEN_APPS_EXTRA, showHiddenGames);
         startActivity(i);
+
+
+        Intent b = new Intent(this, AppView_Fragment.class);
+        Bundle a = new Bundle();
+        a.putString(AppView.NAME_EXTRA, computer.name);
+        a.putString(AppView.UUID_EXTRA, computer.uuid);
+        a.putBoolean(AppView.NEW_PAIR_EXTRA, newlyPaired);
+        a.putBoolean(AppView.SHOW_HIDDEN_APPS_EXTRA, showHiddenGames);
+
+       //getSupportFragmentManager().beginTransaction().replace(R.id.fragmenttest,
+        //       AppView_Fragment.newInstance(computer.name,computer.uuid,newlyPaired,showHiddenGames)).commitAllowingStateLoss();
+
+        appViewFragmentInitialization();
     }
 
     @Override
     public boolean onContextItemSelected(MenuItem item) {
+        System.out.println("CODEFLAG_V");
         AdapterContextMenuInfo info = (AdapterContextMenuInfo) item.getMenuInfo();
         final ComputerObject computer = (ComputerObject) pcGridAdapter.getItem(info.position);
         switch (item.getItemId()) {
@@ -660,6 +750,7 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
     }
     
     private void removeComputer(ComputerDetails details) {
+        System.out.println("CODEFLAG_W");
         managerBinder.removeComputer(details);
 
         new DiskAssetLoader(this).deleteAssetsForComputer(details.uuid);
@@ -725,13 +816,16 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
         pcGridAdapter.notifyDataSetChanged();
     }
 
+    //불러올 프래그먼트 레이아웃
     @Override
     public int getAdapterFragmentLayoutId() {
+        System.out.println("CODEFLAG_Y");
         return R.layout.pc_grid_view;
     }
 
     @Override
     public void receiveAbsListView(AbsListView listView) {
+        System.out.println("CODEFLAG_Z");
         listView.setAdapter(pcGridAdapter);
         listView.setOnItemClickListener(new OnItemClickListener() {
             @Override
@@ -755,9 +849,11 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
     }
 
     public static class ComputerObject {
+
         public ComputerDetails details;
 
         public ComputerObject(ComputerDetails details) {
+            System.out.println("CODEFLAG_AA");
             if (details == null) {
                 throw new IllegalArgumentException("details must not be null");
             }
@@ -769,4 +865,40 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
             return details.name;
         }
     }
+
+    Button btn;
+    EditText editText;
+    TextView textView;
+    public String text;
+
+    protected void saveState(){ // 데이터를 저장한다.
+        System.out.println("CODEFLAG_AB");
+        SharedPreferences pref = getSharedPreferences("pref", Activity.MODE_PRIVATE);
+        SharedPreferences.Editor editor = pref.edit();
+        editor.putString("text", "agree");
+
+        editor.commit();
+
+
+    }
+
+
+    protected void restoreState(){
+        System.out.println("CODEFLAG_AC");// 데이터를 복구한다.
+        SharedPreferences pref = getSharedPreferences("pref", Activity.MODE_PRIVATE);
+        if((pref!=null) && (pref.contains("text"))){
+            text = pref.getString("text", "");
+        }
+
+    }
+    protected void clearPref(){
+        System.out.println("CODEFLAG_AD");// sharedpreference에 쓰여진 데이터 지우기
+        SharedPreferences pref = getSharedPreferences("pref", Activity.MODE_PRIVATE);
+        SharedPreferences.Editor editor = pref.edit();
+        editor.clear();
+        text = null;
+        editor.commit();
+    }
+
+
 }

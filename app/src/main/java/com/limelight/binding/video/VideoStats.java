@@ -13,6 +13,7 @@ class VideoStats {
     int framesLost;
     long measurementStartTimestamp;
 
+
     void add(VideoStats other) {
         this.decoderTimeMs += other.decoderTimeMs;
         this.totalTimeMs += other.totalTimeMs;
@@ -50,6 +51,7 @@ class VideoStats {
         this.framesLost = 0;
         this.measurementStartTimestamp = 0;
     }
+
 
     VideoStatsFps getFps() {
         float elapsed = (SystemClock.uptimeMillis() - this.measurementStartTimestamp) / (float) 1000;
