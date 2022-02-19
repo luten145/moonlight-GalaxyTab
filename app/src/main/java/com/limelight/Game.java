@@ -707,6 +707,7 @@ public class Game extends Activity implements SurfaceHolder.Callback,
 
     protected void onPause() {
         super.onPause();
+        MyAccessibilityService.accessibilityKeyListening=false;
         System.out.println("onPause");
         GlobalExit();
     }
@@ -714,6 +715,7 @@ public class Game extends Activity implements SurfaceHolder.Callback,
     @Override
     protected void onStop() {
         super.onStop();
+        MyAccessibilityService.accessibilityKeyListening=false;
 
         System.out.println("onStop");
         GlobalExit();
@@ -770,7 +772,7 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                         .apply();
             }
         }
-        //finish();
+        finish();
     }
 
     //활동이 소멸될 때 호출되는 함수
@@ -858,9 +860,9 @@ public class Game extends Activity implements SurfaceHolder.Callback,
         airActionServiceReset();
         pointerCaptureOff();
         disconnectToSpenRemote();
+
         if(!releaseVirsion){
             Settings.Secure.putInt(this.getContentResolver(), refershRateMode, 1);
-
         }
         mContext = null;
     }

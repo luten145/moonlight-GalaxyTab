@@ -68,21 +68,15 @@ public class AndroidAudioRenderer implements AudioRenderer {
         int channelConfig;
         int bytesPerFrame;
 
-
-
-
-
         switch (audioConfiguration.channelCount)
         {
             case 2:
                 channelConfig = AudioFormat.CHANNEL_OUT_5POINT1;
                 break;
             case 4:
-                System.out.println("4채널이니?");
                 channelConfig = AudioFormat.CHANNEL_OUT_5POINT1;
                 break;
             case 6:
-                System.out.println("6채널이니?");
                 channelConfig = AudioFormat.CHANNEL_OUT_5POINT1;
                 break;
             case 8:
