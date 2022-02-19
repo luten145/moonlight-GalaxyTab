@@ -16,7 +16,7 @@ It's the same Android platform, but we've made a separate version to optimize fo
 * In moonlight-android/, create a file called ‘local.properties’. Add an ‘ndk.dir=’ property to the local.properties file and set it equal to your NDK directory.
 * Build the APK using Android Studio or gradle
 
-## Authors
+## Original Version Authors
 
 * [Cameron Gutman](https://github.com/cgutman)  
 * [Diego Waxemberg](https://github.com/dwaxemberg)  
