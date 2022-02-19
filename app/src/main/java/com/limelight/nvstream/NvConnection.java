@@ -210,7 +210,6 @@ public class NvConnection {
                 throw e;
             }
         }
-
         return launchNotRunningApp(h, context);
     }
     

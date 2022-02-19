@@ -9,8 +9,8 @@ android {
         minSdkVersion 30
         targetSdkVersion 31
 
-        versionName "9.10.1.1"
-        versionCode = 271
+        versionName "0.0.1"
+        versionCode = 272
     }
 
     flavorDimensions "root"
@@ -19,7 +19,7 @@ android {
         root {
             // Android O has native mouse capture, so don't show the rooted
             // version to devices running O on the Play Store.
-            maxSdkVersion 25
+            maxSdkVersion 30
 
             externalNativeBuild {
                 ndkBuild {

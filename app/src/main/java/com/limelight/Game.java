@@ -1,17 +1,16 @@
 package com.limelight;
 
+//1.임포트
 import static android.content.ContentValues.TAG;
 import static com.limelight.nvstream.input.KeyboardPacket.MODIFIER_WIN;
 
 import com.limelight.binding.PlatformBinding;
 import com.limelight.binding.input.ControllerHandler;
 import com.limelight.binding.input.KeyboardTranslator;
-import com.limelight.binding.input.capture.InputCaptureManager;
-import com.limelight.binding.input.capture.InputCaptureProvider;
+
 import com.limelight.binding.input.touch.AbsoluteTouchContext;
 import com.limelight.binding.input.touch.RelativeTouchContext;
 import com.limelight.binding.input.driver.UsbDriverService;
-import com.limelight.binding.input.evdev.EvdevListener;
 import com.limelight.binding.input.touch.TouchContext;
 import com.limelight.binding.input.virtual_controller.VirtualController;
 import com.limelight.binding.video.CrashListener;
@@ -38,12 +37,10 @@ import com.limelight.utils.SpinnerDialog;
 import com.limelight.utils.UiHelper;
 
 import android.annotation.SuppressLint;
-import android.annotation.TargetApi;
 import android.app.Activity;
 import android.app.PictureInPictureParams;
 import android.app.Service;
 import android.content.ComponentName;
-import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
@@ -53,63 +50,44 @@ import android.content.pm.PackageManager;
 import android.content.res.Configuration;
 import android.graphics.Bitmap;
 import android.graphics.Color;
-import android.graphics.Matrix;
-import android.graphics.Point;
 import android.graphics.Rect;
 import android.hardware.input.InputManager;
 import android.media.AudioManager;
 import android.net.ConnectivityManager;
 import android.net.TrafficStats;
-import android.net.Uri;
 import android.net.wifi.WifiManager;
 import android.os.BatteryManager;
 import android.os.Build;
 import android.os.Bundle;
-import android.os.CancellationSignal;
-import android.os.Environment;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
 import android.os.SystemClock;
 import android.provider.Settings;
-import android.text.Layout;
 import android.util.Log;
 import android.util.Rational;
 import android.view.Display;
 import android.view.InputDevice;
 import android.view.KeyEvent;
-import android.view.Menu;
 import android.view.MotionEvent;
 import android.view.PixelCopy;
 import android.view.Surface;
 import android.view.SurfaceHolder;
-import android.view.SurfaceView;
 import android.view.View;
 import android.view.View.OnGenericMotionListener;
 import android.view.View.OnSystemUiVisibilityChangeListener;
 import android.view.View.OnTouchListener;
 import android.view.Window;
-import android.view.WindowInsetsAnimationControlListener;
-import android.view.WindowInsetsController;
 import android.view.WindowManager;
-import android.view.animation.Interpolator;
 import android.widget.Button;
 import android.widget.FrameLayout;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.TextView;
-import android.widget.ThemedSpinnerAdapter;
 import android.widget.Toast;
 
-import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
-import androidx.annotation.RequiresApi;
-import androidx.core.content.FileProvider;
-
 import java.io.ByteArrayInputStream;
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
 import java.security.cert.CertificateException;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
@@ -121,29 +99,36 @@ import java.util.TimerTask;
 
 import com.samsung.android.sdk.penremote.AirMotionEvent;
 import com.samsung.android.sdk.penremote.ButtonEvent;
-import com.samsung.android.sdk.penremote.SpenEvent;
 import com.samsung.android.sdk.penremote.SpenEventListener;
 import com.samsung.android.sdk.penremote.SpenRemote;
 import com.samsung.android.sdk.penremote.SpenUnit;
 import com.samsung.android.sdk.penremote.SpenUnitManager;
 
 
-//1.클래스 시작
+//2.클래스 시작
 public class Game extends Activity implements SurfaceHolder.Callback,
-        OnGenericMotionListener, OnTouchListener, NvConnectionListener, EvdevListener,
+        OnGenericMotionListener, OnTouchListener, NvConnectionListener,
         OnSystemUiVisibilityChangeListener, GameGestures, StreamView.InputCallbacks,
-        PerfOverlayListener
-{
-    //2.private_static 변수
+        PerfOverlayListener {
+
+    //______________________________________________________________________________________________
+
+    // System Settings
+    private static final String refershRateMode = "refresh_rate_mode";
+    private WifiManager.WifiLock highPerfWifiLock;
+    private WifiManager.WifiLock lowLatencyWifiLock;
+    //----------------------------------------------------------------------------------------------
+    //----------------------------------------------------------------------------------------------
+    // Moonlight Settings
+    private PreferenceConfiguration prefConfig;
+    private SharedPreferences tombstonePrefs;
+    //----------------------------------------------------------------------------------------------
+    //----------------------------------------------------------------------------------------------
+    // Connection
+    // Reference
     private static NvConnection conn;
-
-    private static final int REFERENCE_HORIZ_RES = 1280;
-    private static final int REFERENCE_VERT_RES = 720;
-
-    // Only 2 touches are supported
-    private static final int THREE_FINGER_TAP_THRESHOLD = 300;
-
-    //3.public_static 변수
+    private ShortcutHelper shortcutHelper;
+    public X509Certificate setServerCert;
     public static final String EXTRA_HOST = "Host";
     public static final String EXTRA_APP_NAME = "AppName";
     public static final String EXTRA_APP_ID = "AppId";
@@ -152,172 +137,163 @@ public class Game extends Activity implements SurfaceHolder.Callback,
     public static final String EXTRA_PC_NAME = "PcName";
     public static final String EXTRA_APP_HDR = "HDR";
     public static final String EXTRA_SERVER_CERT = "ServerCert";
-
-    public static Timer spenMotionOffTimer;
-    public static Timer spenDelay;
-
-    private static SpenRemote mSpenRemote;
-    private static SpenUnitManager mSpenUnitManager;
-
-
-    public static boolean BUTTONSTATEDOWN;
-    public static boolean BUTTONSTATEUP;
-    public static boolean KeyboardServiceState = false;
-    public static boolean spenMotionsend = false;
-
-    public static float motionDeltaX;
-    public static float motionDeltaY;
-
-    //private 변수
-    private long threeFingerDownTime = 0;
-    private final TouchContext[] touchContextMap = new TouchContext[2];
-    private ControllerHandler controllerHandler;
-    private VirtualController virtualController;
-    private PreferenceConfiguration prefConfig;
-    private SharedPreferences tombstonePrefs;
-    private SpinnerDialog spinner;
-    private InputCaptureProvider inputCaptureProvider;
-    private ShortcutHelper shortcutHelper;
-    private MediaCodecDecoderRenderer decoderRenderer;
-    private WifiManager.WifiLock highPerfWifiLock;
-    private WifiManager.WifiLock lowLatencyWifiLock;
-    private StreamView streamView;
-
-    private TextView notificationOverlayView;
-
-    private Timer tapDownTimer;
-
-    //4.private_bool변스
-    private boolean displayedFailureDialog = false;
+    // Switch
     private boolean connecting = false;
     private boolean connected = false;
-    private boolean autoEnterPip = false;
-    private boolean surfaceCreated = false;
     private boolean attemptedConnection = false;
-    private boolean padMoveStatus = false;
-    private boolean padTimer = false;
-    private boolean grabbedInput = true;
-    private boolean grabComboDown = false;
-    private boolean reportedCrash;
+    //----------------------------------------------------------------------------------------------
+    //----------------------------------------------------------------------------------------------
+    // UI
+    // Data
+    public static int viewHeight;
+    public static int viewWidth;
+    public float moveTimer = 0;
+    public static Context mContext;
+    // Reference
+    private SpinnerDialog spinner;
+    private StreamView streamView;
+    private ImageView reconnectionWaitingImage;
+    private ImageView notchBackground;
+    private TextView notificationOverlayView;
+    private TextView norchRight;
+    private TextView norchLeft;
+    // Switch
+    private boolean surfaceCreated = false;
     private boolean isHidingOverlays;
-    private boolean connectedToUsbDriverService = false;
-
-    //5.private_float 변수
-    private float lastAbsTouchUpX, lastAbsTouchUpY;
-    private float lastAbsTouchDownX, lastAbsTouchDownY;
-    private float dragRight;
-    private float dragLeft;
-    private float dragUp;
-    private float dragDown;
-    private float lastPadDragStartY ;
-    private float lastPadDragStartX ;
-
-    private long lastAbsTouchUpTime = 0;
-    private long lastAbsTouchDownTime = 0;
-
-    private int lastButtonState = 0;
-    private int modifierFlags = 0;
     private int requestedNotificationOverlayVisibility = View.GONE;
-    private int moveDirection = 0;
-
-    //트랙패드 관련 변수
-    public boolean trackPadTouchDownStatus = false;
-    private static boolean mouseDownStatus = false;
-    private float lastPadTouchDownX;
-    private float lastPadTouchDownY;
-    private float lastPadTouchUpY ;
-    private float lastPadTouchUpX ;
-    private float movePointer ;
-    private float lastPadDragX;
-    private float lastPadDragY;
-    private float trackPadThreeFinger=0;
-    private boolean altTabSwitch=false;
-    private boolean trackPadfirstMove = false;
-    private boolean trackPadScrollButton =false;
-
-    public static float touchUpTime;
-    public static Timer mouseClick;
-    public float dotToDotLength;
+    private boolean autoEnterPip = false;
+    private boolean displayedFailureDialog = false;
+    public boolean overlaySwitch = false;
+    public boolean SurfaceViewState = false;
+    public boolean pixelCopyState = false;
+    //----------------------------------------------------------------------------------------------
+    //----------------------------------------------------------------------------------------------
+    // Decode
+    // Reference
+    private MediaCodecDecoderRenderer decoderRenderer;
+    // Switch
+    private boolean reportedCrash;
+    //----------------------------------------------------------------------------------------------
+    //----------------------------------------------------------------------------------------------
+    // Input
+    // USB Devices
+    private boolean connectedToUsbDriverService = false;
+    //----------------------------------------------------------------------------------------------
+    // UI Input
+    public Button action1;
+    public Button action2;
+    //----------------------------------------------------------------------------------------------
+    // KeyBoard
+    public static int KeyCombination = 0;
+    // Mouse
+    public int lastButtonDown;
+    //----------------------------------------------------------------------------------------------
+    // AirAction
+    // Settings
+    private static short airAction_DisableMotionListeningWaitTime = 5000;
+    private static short airAction_MoveSpeed = 500;
+    // Reference
+    private static final SpenRemote mSpenRemote = SpenRemote.getInstance();
+    private static SpenUnitManager mSpenUnitManager;
+    // Time
+    private Timer airAction_MoveWait;
+    private Timer airAction_ButtonUpInputWaitingTime;
+    private Timer airAction_DisableMotionListening;
+    // Switch
+    private boolean airAction_Move = false;
+    private static short airAction_Mode = 0;
+    private static boolean airAction_IsButtonListening = false;
+    private static boolean airAction_IsMotionListening = false;
+    private boolean airAction_ButtonUpInput = true;
+    // Other
+    public static float spenButtonDownTime;
+    //----------------------------------------------------------------------------------------------
+    // TrackPad
+    // Settings
+    private static short trackPad_autoMoveInterval = 20;
+    private static short trackPad_TapEventThreshold = 200;
+    // Data
+    private float trackPad_Single_StartRawX;
+    private float trackPad_Single_StartRawY;
+    private float trackPad_Single_EndRawX;
+    private float trackPad_Single_EndRawY;
+    private float trackPad_Double_Start_PointToPointDistance;
+    private float trackPad_Triple_StartRawX;
+    private float trackPad_Triple_StartRawY;
+    // Time
+    private Timer trackPad_Single_TapClick;
+    private long trackPad_Single_autoMoveEventTime;
+    // Switch
+    public boolean trackPad_Move = true;
+    private boolean trackPad_Single_EventQueue = false;
+    private boolean trackPad_Single_DownStatus = false;
+    private short trackPad_Double_Mode = 0;
+    private short trackPad_Double_Mode_0 = 0;
+    private boolean trackPad_Double_One_Time_Event = false;
+    private short trackPad_Triple_Mode = 0;
+    private boolean trackPad_Global_One_Time_Event = false;
+    // Other
+    public boolean stopAutoMove = false;
     public float PadScroll;
     public float PadScrollY;
     public float zoom;
-    public static float spenButtonDownTime;
+    private Timer tapDownTimer;
+    private boolean padMoveStatus = false;
+    private boolean padTimer = false;
+    public static float touchUpTime;
+    //----------------------------------------------------------------------------------------------
+    // Legacy
+    // Controller
+    private ControllerHandler controllerHandler;
+    private VirtualController virtualController;
+    private boolean grabbedInput = true;
+    private boolean grabComboDown = false;
+    private float lastAbsTouchUpX, lastAbsTouchUpY;
+    private float lastAbsTouchDownX, lastAbsTouchDownY;
+    private long lastAbsTouchUpTime = 0;
+    private long lastAbsTouchDownTime = 0;
+    private int lastButtonState = 0;
+    // Touch
+    // Reference
+    private static final int REFERENCE_HORIZ_RES = 1280;
+    private static final int REFERENCE_VERT_RES = 720;
+    private final TouchContext[] touchContextMap = new TouchContext[2];
+    // 3 터치 후 키보드
+    private static final int THREE_FINGER_TAP_THRESHOLD = 300;
+    // 3핑거 터치 다운타임
+    private long threeFingerDownTime = 0;
 
-    public boolean stop;
-    public static boolean touchQueue =false;
-    public boolean landMode = false;
-
-    public boolean scrollQueue = false;
-    public boolean scrollMode = true;
-    public boolean pinchMode = false;
-
-    //s펜 관련 변수
-    private static boolean mIsMotionListening = false;
-    private static TextView spenDebug;
-    private static Timer spenDebugUpdateTimer;
-
-    public static boolean spenConnectionStatus;
-    public static boolean spenButtonStatus;
-    public static int spenState;
-
-    //오버레이 관련 변수
-    public TextView norchRight;
-    public TextView norchLeft;
-    public X509Certificate setServerCert;
-
-    public static long TotalTx;
-    public static long TotalRx;
-
-    public int lastButtonDown;
-
-    //액티브 기술 관련 변수
-    private static final String refershRateMode = "refresh_rate_mode";
+    //----------------------------------------------------------------------------------------------
+    //----------------------------------------------------------------------------------------------
+    // StatusInfo
+    // DecoderStatusInfo
+    public int gResolutionWidth;
+    public int gResolutionHeight;
+    public short gTotalFps;
+    public short gReceivedFps;
+    public short gRenderedFps;
+    public int gPing;
+    public int gVariance;
+    public short gDecodeTime;
+    public float gPacketLossPercentage;
+    // NetWorkStatusInfo
+    private long TotalTx;
+    private long TotalRx;
+    //----------------------------------------------------------------------------------------------
+    //----------------------------------------------------------------------------------------------
+    // Active
     public int setBitrate;
-
-    public float suggestBitrate ;
-
-    public Button action1;
-    public Button action2;
-
-    //디코더 퍼포먼스 정보
-    public static int gResolutionWidth;
-    public static int gResolutionHeight;
-    public static short gTotalFps;
-    public static short gReceivedFps;
-    public static short gRenderedFps;
-    public static int gPing;
-    public static int gVariance;
-    public static short gDecodeTime;
-    public static float gPacketLossPercentage;
-
-    public  ContentResolver contentResolver ;
-    public Context gameContext;
+    public float suggestBitrate;
 
     public Timer autoReconnectTimer;
     public Timer autoReconnectPoorTimer;
+    //_______________________________________________________________________________________________
 
-    public Timer autoBackgroundTimer;
+    public static int swi = 0;
+    public static final boolean releaseVirsion = true ;
+    public View norch;
 
-    public float moveTimer = 0 ;
-
-    public boolean overlaySwitch = false;
-
-    public View imagetest;
-    public ImageView imagetest2;
-
-    public boolean SurfaceViewState = false;
-    public boolean pixelCopyState = false;
-
-    public static boolean ONEClick;
-
-    //에어액션 관련 변수
-    public static short airActionMode = 0;
-
-
-    //트랙패드 관련 변수
-    public static boolean trackPadMove = true;
-
-    //USB 연결상태 확인 함수
+    //3.서비스
     private ServiceConnection usbDriverServiceConnection = new ServiceConnection() {
         @Override
         public void onServiceConnected(ComponentName componentName, IBinder iBinder) {
@@ -331,143 +307,22 @@ public class Game extends Activity implements SurfaceHolder.Callback,
         }
     };
 
-    //onCreate 함수
+    //4.활동주기 : onCreate
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        //제목 표시줄 제거
         requestWindowFeature(Window.FEATURE_NO_TITLE);
         setContentView(R.layout.activity_game);
 
-        Settings.Secure.putInt(this.getContentResolver(),refershRateMode,1);
-        gameContext= this;
-        //7-1.접근성 키 입력 제어 권한 활성화
-        KeyboardServiceState = true ;
+        //__________________________________________________________________________________________
+        // System Settings
 
-        //언어 설정
-        UiHelper.setLocale(this);
-
-        //7-2.S펜 에어액션 초기화
-        mSpenRemote = SpenRemote.getInstance();
-        mSpenRemote.setConnectionStateChangeListener(new SpenRemote.ConnectionStateChangeListener() {
-            @Override
-            public void onChange(int i) {
-
-            }
-        });
-        checkSdkInfo();
-        //s펜 연결
-        connectToSpenRemote();
-
-
-        // 전체화면 모드 전환
-        getWindow().addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
-        // immersive mode 선언  전체화면 모드
-        getWindow().getDecorView().setSystemUiVisibility(
-                View.SYSTEM_UI_FLAG_LAYOUT_STABLE |
-                        View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION |
-                        View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN);
-        getWindow().addFlags(WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN);
-
-        //해석되지 않은 코드
-        // Listen for UI visibility events
-        getWindow().getDecorView().setOnSystemUiVisibilityChangeListener(this);
-        // Change volume button behavior
-        setVolumeControlStream(AudioManager.STREAM_MUSIC);
-        // Inflate the content
-
-        //대기 화면 시작
-        if(!ServerHelper.restart) {
-            spinner = SpinnerDialog.displayDialog(this, getResources().getString(R.string.conn_establishing_title),
-                    getResources().getString(R.string.conn_establishing_msg), true);
-        }
-        else {
-            Toast.makeText(this, "네트워크가 불안정하여 비트레이트를 조정했습니다.",
-                    Toast.LENGTH_LONG).show();
-        }
-
-        //환경설정 값 가져오기
-        prefConfig = PreferenceConfiguration.readPreferences(this);
-        tombstonePrefs = Game.this.getSharedPreferences("DecoderTombstone", 0);
-        if (prefConfig.stretchVideo || shouldIgnoreInsetsForResolution(prefConfig.width, prefConfig.height)) {
-            // Allow the activity to layout under notches if the fill-screen option
-            // was turned on by the user or it's a full-screen native resolution
-            getWindow().getAttributes().layoutInDisplayCutoutMode =
-                    WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS;
-        }
-
-        notificationOverlayView = findViewById(R.id.notificationOverlay);
-        norchRight = findViewById(R.id.norchRight);
-        norchLeft = findViewById(R.id.norchLeft);
-        spenDebug = findViewById(R.id.spenDebug);
-        streamView = findViewById(R.id.surfaceView);
-        action1 = findViewById(R.id.action1);
-        action2 = findViewById(R.id.action2);
-        imagetest = findViewById(R.id.imagetest);
-        imagetest2 = findViewById(R.id.imim);
-
-        Bitmap image = AppView.reBitrate;
-
-        imagetest2.setImageBitmap(image);
-        imagetest2.setVisibility(View.VISIBLE);
-
-        if(Build.MODEL.equals("SM-T975N")){
-            imagetest.setVisibility(View.GONE);
-        }
-
-        streamView.setOnGenericMotionListener(this);
-        streamView.setOnTouchListener(this);
-        streamView.setInputCallbacks(this);
-        action1.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                Reconnect();
-            }
-        });
-
-        action2.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-
-                if (!overlaySwitch) {
-                    overlaySwitch = true;
-                    norchLeft.setVisibility(View.GONE);
-                    norchRight.setVisibility(View.GONE);
-                } else {
-                    overlaySwitch = false;
-                    norchLeft.setVisibility(View.VISIBLE);
-                    norchRight.setVisibility(View.VISIBLE);
-                }
-            }
-        });
-
-        inputCaptureProvider = InputCaptureManager.getInputCaptureProvider(this, this);
-
-        //포인터 캡쳐 관련 함수
-        streamView.setFocusable(true);
-        streamView.setDefaultFocusHighlightEnabled(false);
-        streamView.setOnCapturedPointerListener(new View.OnCapturedPointerListener() {
-            @Override
-            public boolean onCapturedPointer(View view, MotionEvent motionEvent) {
-                return pointerCaptureInputManager(view, motionEvent);
-            }
-        });
-
-        //네트워크 관련 코드
-        // 데이터 연결 경고
-        ConnectivityManager connMgr = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
-
-        if (connMgr.isActiveNetworkMetered()) {
-            displayTransientMessage(getResources().getString(R.string.conn_metered));
-        }
+        // 네트워크
         // Wifi 설정 (고성능 모드로)
         WifiManager wifiMgr = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
         highPerfWifiLock = wifiMgr.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "Moonlight High Perf Lock");
         highPerfWifiLock.setReferenceCounted(false);
         highPerfWifiLock.acquire();
-
-        TotalTx = TrafficStats.getTotalTxBytes();
-        TotalRx =  TrafficStats.getTotalRxBytes();
 
         // Wifi 설정 (Q버전 이상 로우 레이턴시 모드 활성화)
         // wifi검색 빈도가 줄어듭니다
@@ -477,6 +332,51 @@ public class Game extends Activity implements SurfaceHolder.Callback,
         lowLatencyWifiLock.setReferenceCounted(false);
         lowLatencyWifiLock.acquire();
 
+        // 120Hz로 전환
+        if(!releaseVirsion){
+            Settings.Secure.putInt(this.getContentResolver(), refershRateMode, 1);
+        }
+
+        setVolumeControlStream(AudioManager.STREAM_MUSIC);
+
+        // 성능
+        // 일관성을 보장하기 위해 지속 성능 모드를 사용합니다. (클럭 낮춘상태에서 안정적 실행 가능)
+        getWindow().setSustainedPerformanceMode(true);
+        // Listen for UI visibility events
+        getWindow().getDecorView().setOnSystemUiVisibilityChangeListener(this);
+
+        // 전체화면 설정
+        getWindow().getDecorView().setSystemUiVisibility(
+                View.SYSTEM_UI_FLAG_LAYOUT_STABLE |
+                        View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION |
+                        View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN |
+                        View.SYSTEM_UI_FLAG_HIDE_NAVIGATION |
+                        View.SYSTEM_UI_FLAG_FULLSCREEN |
+                        View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
+
+        //VPN 상태 확인
+        boolean vpnActive = NetHelper.isActiveNetworkVpn(this);
+        if (vpnActive) {
+            LimeLog.info("Detected active network is a VPN");
+        }
+
+        //------------------------------------------------------------------------------------------
+        //------------------------------------------------------------------------------------------
+        // Moonlight Settings
+        UiHelper.setLocale(this);
+        // Moonlight Settings
+        prefConfig = PreferenceConfiguration.readPreferences(this);
+        tombstonePrefs = Game.this.getSharedPreferences("DecoderTombstone", 0);
+        //------------------------------------------------------------------------------------------
+        //------------------------------------------------------------------------------------------
+        // Connection
+        // 데이터 연결 경고
+        ConnectivityManager connMgr = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
+        //데이터네트워크가 측정되는지 (예 : 데이터 요금 책정을 위해 데이터 사용량 기록) 확인
+        if (connMgr.isActiveNetworkMetered()) {
+            displayTransientMessage(getResources().getString(R.string.conn_metered));
+        }
+        // 컴퓨터 연결
         // 컴퓨터 정보 가져오기 코드
         String host = Game.this.getIntent().getStringExtra(EXTRA_HOST);
         String appName = Game.this.getIntent().getStringExtra(EXTRA_APP_NAME);
@@ -518,7 +418,6 @@ public class Game extends Activity implements SurfaceHolder.Callback,
             shortcutHelper.reportGameLaunched(computer, new NvApp(appName, appId, appSupportsHdr));
         }
 
-        //알 수 없는 코드
         // Initialize the MediaCodec helper before creating the decoder
         GlPreferences glPrefs = GlPreferences.readPreferences(this);
         MediaCodecHelper.initialize(this, glPrefs.glRenderer);
@@ -540,25 +439,57 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                 }
             }
             if (!willStreamHdr) {
-                Toast.makeText(this, "이 디스플레이는 Hdr10을 지원하지 않습니다.", Toast.LENGTH_LONG).show();
+                Toast.makeText(this, "이 디스플레이는 Hdr10을 지원하지 않습니다.",
+                        Toast.LENGTH_LONG).show();
             }
         }
 
-        // 사용자가 성능 통계 오버레이를 활성화했는지 확인
-        // 사용자가 성능 통계 활성화 코드
+        //------------------------------------------------------------------------------------------
+        //------------------------------------------------------------------------------------------
+        // UI
+        //로딩 바 시작
+        if (!ServerHelper.restart) {
+            spinner = SpinnerDialog.displayDialog(this, getResources().getString(R.string.conn_establishing_title),
+                    getResources().getString(R.string.conn_establishing_msg), true);
+        } else {
+            reconnectionWaitingImage = findViewById(R.id.imim);
+            reconnectionWaitingImage.setImageBitmap(AppView.reBitrate);
+            reconnectionWaitingImage.setVisibility(View.VISIBLE);
+            Toast.makeText(this, "네트워크가 불안정하여 비트레이트를 조정했습니다.",
+                    Toast.LENGTH_LONG).show();
+        }
+        notificationOverlayView = findViewById(R.id.notificationOverlay);
+        norchRight = findViewById(R.id.norchRight);
+        norchLeft = findViewById(R.id.norchLeft);
+        streamView = findViewById(R.id.surfaceView);
+        notchBackground = findViewById(R.id.norchBackground);
 
-        //디코더 렌더러 정의
-        decoderRenderer = new MediaCodecDecoderRenderer(
-                this,
-                prefConfig,
-                new CrashListener() {
+        norch = findViewById(R.id.norch);
+        norch.setVisibility(View.GONE);
+        if(Build.MODEL.equals("SM-X906N")||Build.MODEL.equals("SM-X900")){
+            if(prefConfig.height == 1820){
+                norch.setVisibility(View.VISIBLE);
+            }
+        }
+        if (prefConfig.stretchVideo || shouldIgnoreInsetsForResolution(prefConfig.width,
+                prefConfig.height)) {
+            // Allow the activity to layout under notches if the fill-screen option
+            // was turned on by the user or it's a full-screen native resolution
+            getWindow().getAttributes().layoutInDisplayCutoutMode =
+                    WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS;
+        }
+
+        //------------------------------------------------------------------------------------------
+        //------------------------------------------------------------------------------------------
+        // Decode
+        decoderRenderer = new MediaCodecDecoderRenderer(this, prefConfig, new CrashListener() {
                     @Override
                     public void notifyCrash(Exception e) {
                         // The MediaCodec instance is going down due to a crash
                         // let's tell the user something when they open the app again
-
                         // We must use commit because the app will crash when we return from this function
-                        tombstonePrefs.edit().putInt("CrashCount", tombstonePrefs.getInt("CrashCount", 0) + 1).commit();
+                        tombstonePrefs.edit().putInt("CrashCount", tombstonePrefs.getInt(
+                                "CrashCount", 0) + 1).commit();
                         reportedCrash = true;
                     }
                 },
@@ -571,14 +502,27 @@ public class Game extends Activity implements SurfaceHolder.Callback,
         // Don't stream HDR if the decoder can't support it
         if (willStreamHdr && !decoderRenderer.isHevcMain10Hdr10Supported()) {
             willStreamHdr = false;
-            Toast.makeText(this, "Decoder does not support HEVC Main10HDR10", Toast.LENGTH_LONG).show();
+            Toast.makeText(this, "Decoder does not support HEVC Main10HDR10",
+                    Toast.LENGTH_LONG).show();
         }
-
         // Display a message to the user if HEVC was forced on but we still didn't find a decoder
-        if (prefConfig.videoFormat == PreferenceConfiguration.FORCE_H265_ON && !decoderRenderer.isHevcSupported()) {
-            Toast.makeText(this, "No HEVC decoder found.\nFalling back to H.264.", Toast.LENGTH_LONG).show();
+        if (prefConfig.videoFormat == PreferenceConfiguration.FORCE_H265_ON && !decoderRenderer.
+                isHevcSupported()) {
+            Toast.makeText(this, "No HEVC decoder found.\nFalling back to H.264.",
+                    Toast.LENGTH_LONG).show();
         }
-
+        //기타
+        if (!decoderRenderer.isAvcSupported()) {
+            if (spinner != null) {
+                spinner.dismiss();
+                spinner = null;
+            }
+            // If we can't find an AVC decoder, we can't proceed
+            Dialog.displayDialog(this, getResources().getString(R.string.conn_error_title),
+                    "This device or ROM doesn't support hardware accelerated H.264 playback.",
+                    true);
+            return;
+        }
         int gamepadMask = ControllerHandler.getAttachedControllerMask(this);
         if (!prefConfig.multiController) {
             // Always set gamepad 1 present for when multi-controller is
@@ -590,10 +534,9 @@ public class Game extends Activity implements SurfaceHolder.Callback,
             // If we're using OSC, always set at least gamepad 1.
             gamepadMask |= 1;
         }
-
         // Set to the optimal mode for streaming
         float displayRefreshRate = prepareDisplayForRendering();
-        LimeLog.info("Display refresh rate: "+displayRefreshRate);
+        LimeLog.info("Display refresh rate: " + displayRefreshRate);
 
         // HACK: Despite many efforts to ensure low latency consistent frame
         // delivery, the best non-lossy mechanism is to buffer 1 extra frame
@@ -625,8 +568,7 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                     LimeLog.info("Using Pixel 4 rendering hack");
                     decoderRenderer.enableLegacyFrameDropRendering();
                 }
-            }
-            else if (prefConfig.fps >= roundedRefreshRate) {
+            } else if (prefConfig.fps >= roundedRefreshRate) {
                 if (prefConfig.unlockFps) {
                     // Use frame drops when rendering above the screen frame rate
                     decoderRenderer.enableLegacyFrameDropRendering();
@@ -646,14 +588,50 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                 }
             }
         }
-
-        boolean vpnActive = NetHelper.isActiveNetworkVpn(this);
-        if (vpnActive) {
-            LimeLog.info("Detected active network is a VPN");
-        }
-
+        // Decoder Config Complete
         autoBitrate();
-
+        //----------------------------------------------------------------------------------------------
+        //----------------------------------------------------------------------------------------------
+        // Input
+        // UI Input
+        action1 = findViewById(R.id.action1);
+        action1.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                Reconnect();
+            }
+        });
+        action2 = findViewById(R.id.action2);
+        action2.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (!overlaySwitch) {
+                    overlaySwitch = true;
+                    norchLeft.setVisibility(View.GONE);
+                    norchRight.setVisibility(View.GONE);
+                } else {
+                    overlaySwitch = false;
+                    norchLeft.setVisibility(View.VISIBLE);
+                    norchRight.setVisibility(View.VISIBLE);
+                }
+            }
+        });
+        //------------------------------------------------------------------------------------------
+        // Mouse
+        // 포인터 캡쳐
+        streamView.setFocusable(true);
+        streamView.setDefaultFocusHighlightEnabled(false);
+        streamView.requestPointerCapture();
+        pointerCaptureOn();
+        streamView.setOnGenericMotionListener(this);
+        //------------------------------------------------------------------------------------------
+        // AirAction
+        checkSdkInfo();
+        //------------------------------------------------------------------------------------------
+        // Legacy
+        streamView.setOnTouchListener(this);
+        streamView.setInputCallbacks(this);
+        // 인풋 리스너 설정
         InputManager inputManager = (InputManager) getSystemService(Context.INPUT_SERVICE);
         inputManager.registerInputDeviceListener(controllerHandler, null);
 
@@ -661,118 +639,90 @@ public class Game extends Activity implements SurfaceHolder.Callback,
         for (int i = 0; i < touchContextMap.length; i++) {
             if (!prefConfig.touchscreenTrackpad) {
                 touchContextMap[i] = new AbsoluteTouchContext(conn, i, streamView);
-            }
-            else {
+            } else {
                 touchContextMap[i] = new RelativeTouchContext(conn, i,
                         REFERENCE_HORIZ_RES, REFERENCE_VERT_RES,
                         streamView);
             }
         }
-
-        // 일관성을 보장하기 위해 N+에서 지속 성능 모드를 사용합니다. (클럭 낮춘상태에서 안정적 실행 가능)
-        getWindow().setSustainedPerformanceMode(true);
-
         if (prefConfig.onscreenController) {
             // 가상 화면 컨트롤러 생성
             virtualController = new VirtualController(controllerHandler,
-                    (FrameLayout)streamView.getParent(),
+                    (FrameLayout) streamView.getParent(),
                     this);
             virtualController.refreshLayout();
             virtualController.show();
         }
-
         if (prefConfig.usbDriver) {
             // USB 드라이버 시작
             bindService(new Intent(this, UsbDriverService.class),
                     usbDriverServiceConnection, Service.BIND_AUTO_CREATE);
         }
-
-        if (!decoderRenderer.isAvcSupported()) {
-            if (spinner != null) {
-                spinner.dismiss();
-                spinner = null;
-            }
-
-            // If we can't find an AVC decoder, we can't proceed
-            Dialog.displayDialog(this, getResources().getString(R.string.conn_error_title),
-                    "This device or ROM doesn't support hardware accelerated H.264 playback.",
-                    true);
-            return;
-        }
-
-
-
-        activeManager();
-
-        Game.this.getWindow().getDecorView().setSystemUiVisibility(
-                View.SYSTEM_UI_FLAG_LAYOUT_STABLE |
-                        View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION |
-                        View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN |
-                        View.SYSTEM_UI_FLAG_HIDE_NAVIGATION |
-                        View.SYSTEM_UI_FLAG_FULLSCREEN |
-                        View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
-
-        // 표면이 생성되면 연결이 시작됩니다.
-        ServerHelper.restart = false;
+        //------------------------------------------------------------------------------------------
+        //------------------------------------------------------------------------------------------
+        // StatusInfo
+        //자동 업데이트 시작
+        AutoCallSec();
+        //현재 Tx Rx 값 기록
+        TotalTx = TrafficStats.getTotalTxBytes();
+        TotalRx = TrafficStats.getTotalRxBytes();
+        //------------------------------------------------------------------------------------------
+        //------------------------------------------------------------------------------------------
+        // Active
+        // 노치 배경 업데이트 시작
         overlayBackground();
+        //__________________________________________________________________________________________
+        // Environment Setup Complete
+        // Connection Start!
         streamView.getHolder().addCallback(this);
     }
-
 
     @Override
     protected void onStart() {
         super.onStart();
     }
 
-    //활동이 다시 시작됬을때 호출함수
     @Override
     protected void onResume() {
         super.onResume();
+        mContext = this;
+        System.out.println("onResume");
+        accessibilityKeyOn();
+        connectToSpenRemote();
+
+        if(!releaseVirsion){
+
+            if(swi==2){
+                ServerHelper.restart = false;
+            }
+            if(swi==1){
+                System.out.println("Reconnect");
+                swi=0;
+                ServerHelper.restart = true;
+                ReconnectOK();
+            }
+        }
+
     }
 
-    //화면 변화 시 호출 함수
-    @Override
-    public void onConfigurationChanged(Configuration newConfig) {
-        super.onConfigurationChanged(newConfig);
-        if (virtualController != null) {
-            // Refresh layout of OSC for possible new screen size
-            virtualController.refreshLayout();
-        }
-        // Hide on-screen overlays in PiP mode
-        if (isInPictureInPictureMode()) {
-            isHidingOverlays = true;
-            if (virtualController != null) {
-                virtualController.hide();
-            }
-            notificationOverlayView.setVisibility(View.GONE);
-        }
-        else {
-            isHidingOverlays = false;
-            // Restore overlays to previous state when leaving PiP
-            if (virtualController != null) {
-                virtualController.show();
-            }
-            notificationOverlayView.setVisibility(requestedNotificationOverlayVisibility);
-        }
-    }
-
-    protected void onPause(){
+    protected void onPause() {
         super.onPause();
+        System.out.println("onPause");
+        GlobalExit();
     }
 
-    //활동에서 나갈때 때 호출되는 함수
     @Override
     protected void onStop() {
         super.onStop();
-        Settings.Secure.putInt(this.getContentResolver(),refershRateMode,1);
 
-        AppView.reBitrate =null;
-
-        ServerHelper.restart = false;
-
+        System.out.println("onStop");
+        GlobalExit();
         SpinnerDialog.closeDialogs(this);
         Dialog.closeDialogs();
+        if(!releaseVirsion){
+            swi=1;
 
+        }
         if (virtualController != null) {
             virtualController.hide();
         }
@@ -788,24 +738,21 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                 int averageDecoderLat = decoderRenderer.getAverageDecoderLatency();
                 String message = null;
                 if (averageEndToEndLat > 0) {
-                    message = getResources().getString(R.string.conn_client_latency)+" "+averageEndToEndLat+" ms";
+                    message = getResources().getString(R.string.conn_client_latency) + " " + averageEndToEndLat + " ms";
                     if (averageDecoderLat > 0) {
-                        message += " ("+getResources().getString(R.string.conn_client_latency_hw)+" "+averageDecoderLat+" ms)";
+                        message += " (" + getResources().getString(R.string.conn_client_latency_hw) + " " + averageDecoderLat + " ms)";
                     }
-                }
-                else if (averageDecoderLat > 0) {
-                    message = getResources().getString(R.string.conn_hardware_latency)+" "+averageDecoderLat+" ms";
+                } else if (averageDecoderLat > 0) {
+                    message = getResources().getString(R.string.conn_hardware_latency) + " " + averageDecoderLat + " ms";
                 }
 
                 // Add the video codec to the post-stream toast
                 if (message != null) {
                     if (videoFormat == MoonBridge.VIDEO_FORMAT_H265_MAIN10) {
                         message += " [HEVC HDR]";
-                    }
-                    else if (videoFormat == MoonBridge.VIDEO_FORMAT_H265) {
+                    } else if (videoFormat == MoonBridge.VIDEO_FORMAT_H265) {
                         message += " [HEVC]";
-                    }
-                    else if (videoFormat == MoonBridge.VIDEO_FORMAT_H264) {
+                    } else if (videoFormat == MoonBridge.VIDEO_FORMAT_H264) {
                         message += " [H.264]";
                     }
                 }
@@ -823,26 +770,18 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                         .apply();
             }
         }
-        finish();
+        //finish();
     }
 
     //활동이 소멸될 때 호출되는 함수
     @Override
     protected void onDestroy() {
         super.onDestroy();
-
-        Settings.Secure.putInt(this.getContentResolver(),refershRateMode,1);
-
-
+        GlobalExit();
         SpinnerDialog.closeDialogs(this);
         Dialog.closeDialogs();
 
         surfaceCreated = false;
-
-        if(autoBackgroundTimer != null){
-            autoBackgroundTimer.cancel();
-            autoBackgroundTimer = null;
-        }
 
         if (virtualController != null) {
             virtualController.hide();
@@ -859,24 +798,21 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                 int averageDecoderLat = decoderRenderer.getAverageDecoderLatency();
                 String message = null;
                 if (averageEndToEndLat > 0) {
-                    message = getResources().getString(R.string.conn_client_latency)+" "+averageEndToEndLat+" ms";
+                    message = getResources().getString(R.string.conn_client_latency) + " " + averageEndToEndLat + " ms";
                     if (averageDecoderLat > 0) {
-                        message += " ("+getResources().getString(R.string.conn_client_latency_hw)+" "+averageDecoderLat+" ms)";
+                        message += " (" + getResources().getString(R.string.conn_client_latency_hw) + " " + averageDecoderLat + " ms)";
                     }
-                }
-                else if (averageDecoderLat > 0) {
-                    message = getResources().getString(R.string.conn_hardware_latency)+" "+averageDecoderLat+" ms";
+                } else if (averageDecoderLat > 0) {
+                    message = getResources().getString(R.string.conn_hardware_latency) + " " + averageDecoderLat + " ms";
                 }
 
                 // Add the video codec to the post-stream toast
                 if (message != null) {
                     if (videoFormat == MoonBridge.VIDEO_FORMAT_H265_MAIN10) {
                         message += " [HEVC HDR]";
-                    }
-                    else if (videoFormat == MoonBridge.VIDEO_FORMAT_H265) {
+                    } else if (videoFormat == MoonBridge.VIDEO_FORMAT_H265) {
                         message += " [HEVC]";
-                    }
-                    else if (videoFormat == MoonBridge.VIDEO_FORMAT_H264) {
+                    } else if (videoFormat == MoonBridge.VIDEO_FORMAT_H264) {
                         message += " [H.264]";
                     }
                 }
@@ -894,9 +830,10 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                         .apply();
             }
         }
-        Settings.Secure.putInt(this.getContentResolver(),refershRateMode,1);
+        if(!releaseVirsion){
+            Settings.Secure.putInt(this.getContentResolver(), refershRateMode, 1);
 
-        KeyboardServiceState = false;
+        }
 
         if (controllerHandler != null) {
             InputManager inputManager = (InputManager) getSystemService(Context.INPUT_SERVICE);
@@ -915,10 +852,297 @@ public class Game extends Activity implements SurfaceHolder.Callback,
             unbindService(usbDriverServiceConnection);
         }
         // Destroy the capture provider
-        inputCaptureProvider.destroy();
     }
 
-    //PIP 관련 함수
+    public void GlobalExit(){
+        airActionServiceReset();
+        pointerCaptureOff();
+        disconnectToSpenRemote();
+        if(!releaseVirsion){
+            Settings.Secure.putInt(this.getContentResolver(), refershRateMode, 1);
+
+        }
+        mContext = null;
+    }
+
+    //______________________________________________________________________________________________
+    // System Settings
+    //시스템 ui숨김처리 함수
+    private void hideSystemUi(int delay) {
+        Handler h = getWindow().getDecorView().getHandler();
+        if (h != null) {
+            h.removeCallbacks(hideSystemUi);
+            h.postDelayed(hideSystemUi, delay);
+        }
+    }
+    //시스템 UI 숨김 처리 함수
+    @SuppressLint("InlinedApi")
+    private final Runnable hideSystemUi = new Runnable() {
+        @Override
+        public void run() {
+            // TODO: Do we want to use WindowInsetsController here on R+ instead of
+            // SYSTEM_UI_FLAG_IMMERSIVE_STICKY? They seem to do the same thing as of S...
+
+            // In multi-window mode on N+, we need to drop our layout flags or we'll
+            // be drawing underneath the system UI.
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && isInMultiWindowMode()) {
+                Game.this.getWindow().getDecorView().setSystemUiVisibility(
+                        View.SYSTEM_UI_FLAG_LAYOUT_STABLE);
+            }
+            // Use immersive mode on 4.4+ or standard low profile on previous builds
+            else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+                Game.this.getWindow().getDecorView().setSystemUiVisibility(
+                        View.SYSTEM_UI_FLAG_LAYOUT_STABLE |
+                                View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION |
+                                View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN |
+                                View.SYSTEM_UI_FLAG_HIDE_NAVIGATION |
+                                View.SYSTEM_UI_FLAG_FULLSCREEN |
+                                View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
+            } else {
+                Game.this.getWindow().getDecorView().setSystemUiVisibility(
+                        View.SYSTEM_UI_FLAG_FULLSCREEN |
+                                View.SYSTEM_UI_FLAG_LOW_PROFILE);
+            }
+        }
+    };
+
+    //----------------------------------------------------------------------------------------------
+    //----------------------------------------------------------------------------------------------
+    // Moonlight Settings
+
+    //----------------------------------------------------------------------------------------------
+    //----------------------------------------------------------------------------------------------
+    // Connection
+    // 연결 전 옵션 설정 메서드
+    public void autoBitrate() {
+        if (AppView.setBitrate == 0) {
+            AppView.setBitrate = prefConfig.bitrate;
+        }
+        setBitrate = AppView.setBitrate;
+        suggestBitrate = (setBitrate / 1000);
+        setBitrate = (int) (setBitrate * 1.2);
+
+        String host = Game.this.getIntent().getStringExtra(EXTRA_HOST);
+        String appName = Game.this.getIntent().getStringExtra(EXTRA_APP_NAME);
+        int appId = Game.this.getIntent().getIntExtra(EXTRA_APP_ID, StreamConfiguration.INVALID_APP_ID);
+        String uniqueId = Game.this.getIntent().getStringExtra(EXTRA_UNIQUEID);
+        String uuid = Game.this.getIntent().getStringExtra(EXTRA_PC_UUID);
+        String pcName = Game.this.getIntent().getStringExtra(EXTRA_PC_NAME);
+        boolean appSupportsHdr = Game.this.getIntent().getBooleanExtra(EXTRA_APP_HDR, false);
+        byte[] derCertData = Game.this.getIntent().getByteArrayExtra(EXTRA_SERVER_CERT);
+
+        boolean vpnActive = NetHelper.isActiveNetworkVpn(this);
+
+        boolean willStreamHdr = false;
+        int gamepadMask = ControllerHandler.getAttachedControllerMask(this);
+
+        float displayRefreshRate = prepareDisplayForRendering();
+        StreamConfiguration config = new StreamConfiguration.Builder()
+                .setResolution(prefConfig.width, prefConfig.height)
+                .setLaunchRefreshRate(prefConfig.fps)
+                .setRefreshRate(prefConfig.fps)
+                .setApp(new NvApp(appName != null ? appName : "app", appId, appSupportsHdr))
+                .setBitrate(setBitrate)
+                .setEnableSops(prefConfig.enableSops)
+                .enableLocalAudioPlayback(prefConfig.playHostAudio)
+                .setMaxPacketSize(vpnActive ? 1024 : 1392) // Lower MTU on VPN
+                .setRemoteConfiguration(vpnActive ? // Use remote optimizations on VPN
+                        StreamConfiguration.STREAM_CFG_REMOTE :
+                        StreamConfiguration.STREAM_CFG_AUTO)
+                .setHevcBitratePercentageMultiplier(100)
+                .setHevcSupported(decoderRenderer.isHevcSupported())
+                .setEnableHdr(willStreamHdr)
+                .setAttachedGamepadMask(gamepadMask)
+                .setClientRefreshRateX100((int) (displayRefreshRate * 100))
+                .setAudioConfiguration(prefConfig.audioConfiguration)
+                .setAudioEncryption(true)
+                .build();
+
+        conn = new NvConnection(host, uniqueId, config, PlatformBinding.getCryptoProvider(this), setServerCert);
+        controllerHandler = new ControllerHandler(this, conn, this, prefConfig);
+    }
+
+    //연결시작시 함수
+    @Override
+    public void connectionStarted() {
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                if (spinner != null) {
+                    spinner.dismiss();
+                    spinner = null;
+                }
+                setPipAutoEnter(true);
+                connected = true;
+                connecting = false;
+
+                if(ServerHelper.restart){
+                    ServerHelper.restart = false;
+                    reconnectionWaitingImage.setVisibility(View.GONE);
+                }
+                // 화면 항상 켜기
+                getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+                hideSystemUi(100);
+            }
+        });
+    }
+    //연결 해제 시 연결을 정리하기 위한 함수
+    private void stopConnection() {
+        if (connecting || connected) {
+            setPipAutoEnter(false);
+            connecting = connected = false;
+            controllerHandler.stop();
+            // 연결을 중지할 때 네트워크 I/O를 수행하여 서버에 우리가 가고 정리할 것임을 알리는 데 수백 ms가 걸릴 수 있습니다.
+            // UI를 원활하게 유지하기 위해 별도의 스레드에서 실행하도록 합니다.
+            // moonlight-common 내부에서는 이 스레드를 중지하기 전과 도중에 다른 스레드가 연결을 시작하는 것을 방지합니다.
+            new Thread() {
+                public void run() {
+                    conn.stop();
+                }
+            }.start();
+        }
+    }
+    //연결 오류 시 발생하는 함수
+    @Override
+    public void stageFailed(final String stage, final int portFlags, final int errorCode) {
+        // 차단된 포트로 인해 장애가 발생한 경우 연결 테스트를 수행합니다.
+        // 이것은 네트워크 I/O를 수행하므로 메인 스레드에서 수행하지 마십시오.
+        final int portTestResult = MoonBridge.testClientConnectivity(ServerHelper.CONNECTION_TEST_SERVER, 443, portFlags);
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                if (spinner != null) {
+                    spinner.dismiss();
+                    spinner = null;
+                }
+                if (!displayedFailureDialog) {
+                    displayedFailureDialog = true;
+                    LimeLog.severe(stage + " failed: " + errorCode);
+                    // 비디오 초기화에 실패하고 표면이 여전히 유효한 경우 사용자에 대한 추가 정보를 표시합니다.
+                    if (stage.contains("video") && streamView.getHolder().getSurface().isValid()) {
+                        Toast.makeText(Game.this, getResources().getText(R.string.video_decoder_init_failed), Toast.LENGTH_LONG).show();
+                    }
+                    String dialogText = getResources().getString(R.string.conn_error_msg) + " " + stage + " (error " + errorCode + ")";
+                    if (portFlags != 0) {
+                        dialogText += "\n\n" + getResources().getString(R.string.check_ports_msg) + "\n" +
+                                MoonBridge.stringifyPortFlags(portFlags, "\n");
+                    }
+                    if (portTestResult != MoonBridge.ML_TEST_RESULT_INCONCLUSIVE && portTestResult != 0) {
+                        dialogText += "\n\n" + getResources().getString(R.string.nettest_text_blocked);
+                    }
+                    Dialog.displayDialog(Game.this, getResources().getString(R.string.conn_error_title), dialogText, true);
+                }
+            }
+        });
+    }
+
+    //연결 끊김 시 호출되는 함수
+    @Override
+    public void connectionTerminated(final int errorCode) {
+        // 차단된 포트로 인해 장애가 발생한 경우 연결 테스트를 수행합니다.
+        // 이것은 네트워크 I/O를 수행하므로 메인 스레드에서 수행하지 마십시오.
+        final int portFlags = MoonBridge.getPortFlagsFromTerminationErrorCode(errorCode);
+        final int portTestResult = MoonBridge.testClientConnectivity(ServerHelper.CONNECTION_TEST_SERVER, 443, portFlags);
+
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                // 이제 화면 항상 켜짐 해제
+                getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+                // 커서숨기기 해제
+
+                if (!displayedFailureDialog) {
+                    displayedFailureDialog = true;
+                    LimeLog.severe("Connection terminated: " + errorCode);
+                    stopConnection();
+
+                    // 예기치 않은 종료인 경우 오류 대화 상자를 표시합니다.
+                    // 그렇지 않으면 즉시 활동을 완료하십시오.
+                    if (errorCode != MoonBridge.ML_ERROR_GRACEFUL_TERMINATION) {
+                        String message;
+
+                        if (portTestResult != MoonBridge.ML_TEST_RESULT_INCONCLUSIVE && portTestResult != 0) {
+                            // If we got a blocked result, that supersedes any other error message
+                            message = getResources().getString(R.string.nettest_text_blocked);
+                        } else {
+                            switch (errorCode) {
+                                case MoonBridge.ML_ERROR_NO_VIDEO_TRAFFIC:
+                                    message = getResources().getString(R.string.no_video_received_error);
+                                    break;
+
+                                case MoonBridge.ML_ERROR_NO_VIDEO_FRAME:
+                                    message = getResources().getString(R.string.no_frame_received_error);
+                                    break;
+
+                                case MoonBridge.ML_ERROR_UNEXPECTED_EARLY_TERMINATION:
+                                case MoonBridge.ML_ERROR_PROTECTED_CONTENT:
+                                    message = getResources().getString(R.string.early_termination_error);
+                                    break;
+
+                                default:
+                                    message = getResources().getString(R.string.conn_terminated_msg);
+                                    break;
+                            }
+                        }
+
+                        if (portFlags != 0) {
+                            message += "\n\n" + getResources().getString(R.string.check_ports_msg) + "\n" +
+                                    MoonBridge.stringifyPortFlags(portFlags, "\n");
+                        }
+
+                        Dialog.displayDialog(Game.this, getResources().getString(R.string.conn_terminated_title),
+                                message, true);
+                    } else {
+                        finish();
+                    }
+                }
+            }
+        });
+    }
+    @Override
+    public void stageStarting(final String stage) {
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                if (spinner != null) {
+                    spinner.setMessage(getResources().getString(R.string.conn_starting) + " " + stage);
+                }
+            }
+        });
+    }
+    @Override
+    public void stageComplete(String stage) {
+    }
+
+    //----------------------------------------------------------------------------------------------
+    //----------------------------------------------------------------------------------------------
+    // UI
+
+    //화면 변화 시 호출 함수
+    @Override
+    public void onConfigurationChanged(Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
+        if (virtualController != null) {
+            // Refresh layout of OSC for possible new screen size
+            virtualController.refreshLayout();
+        }
+        // Hide on-screen overlays in PiP mode
+        if (isInPictureInPictureMode()) {
+            isHidingOverlays = true;
+            if (virtualController != null) {
+                virtualController.hide();
+            }
+            notificationOverlayView.setVisibility(View.GONE);
+        } else {
+            isHidingOverlays = false;
+            // Restore overlays to previous state when leaving PiP
+            if (virtualController != null) {
+                virtualController.show();
+            }
+            notificationOverlayView.setVisibility(requestedNotificationOverlayVisibility);
+        }
+    }
+    // PIP
     private PictureInPictureParams getPictureInPictureParams(boolean autoEnter) {
         PictureInPictureParams.Builder builder =
                 new PictureInPictureParams.Builder()
@@ -933,7 +1157,6 @@ public class Game extends Activity implements SurfaceHolder.Callback,
         return builder.build();
     }
 
-    //PIP자동 전환 함수
     private void setPipAutoEnter(boolean autoEnter) {
         if (!prefConfig.enablePip) {
             return;
@@ -941,10 +1164,14 @@ public class Game extends Activity implements SurfaceHolder.Callback,
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             setPictureInPictureParams(getPictureInPictureParams(autoEnter));
-        }
-        else {
+        } else {
             autoEnterPip = autoEnter;
         }
+    }
+
+    @Override
+    public void onWindowFocusChanged(boolean hasFocus) {
+        super.onWindowFocusChanged(hasFocus);
     }
 
     @Override
@@ -966,40 +1193,124 @@ public class Game extends Activity implements SurfaceHolder.Callback,
         }
     }
 
+    //멀티윈도우 관련 함수
     @Override
-    public void onWindowFocusChanged(boolean hasFocus) {
-        super.onWindowFocusChanged(hasFocus);
-        // We can't guarantee the state of modifiers keys which may have
-        // lifted while focus was not on us. Clear the modifier state.
-        this.modifierFlags = 0;
+    public void onMultiWindowModeChanged(boolean isInMultiWindowMode) {
+        super.onMultiWindowModeChanged(isInMultiWindowMode);
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            // Capture is lost when focus is lost, so it must be requested again
-            // when focus is regained.
-            if (inputCaptureProvider.isCapturingEnabled() && hasFocus) {
-                // Recapture the pointer if focus was regained. On Android Q,
-                // we have to delay a bit before requesting capture because otherwise
-                // we'll hit the "requestPointerCapture called for a window that has no focus"
-                // error and it will not actually capture the cursor.
-                Handler h = new Handler();
-                h.postDelayed(new Runnable() {
-                    @Override
-                    public void run() {
-                        streamView.releasePointerCapture();
-                    }
-                }, 500);
+        // In multi-window, we don't want to use the full-screen layout
+        // flag. It will cause us to collide with the system UI.
+        // This function will also be called for PiP so we can cover
+        // that case here too.
+        if (isInMultiWindowMode) {
+            getWindow().clearFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
+
+            // Disable performance optimizations for foreground
+            getWindow().setSustainedPerformanceMode(false);
+            decoderRenderer.notifyVideoBackground();
+        } else {
+            getWindow().addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
+
+            // Enable performance optimizations for foreground
+            getWindow().setSustainedPerformanceMode(true);
+            decoderRenderer.notifyVideoForeground();
+        }
+
+        // Correct the system UI visibility flags
+        hideSystemUi(50);
+    }
+
+    //디버그 데이터 표시기
+    @SuppressLint("SetTextI18n")
+    public void overlayManager() {
+        //업데이트 될때마다 위치 변경
+        if (moveTimer == 1) {
+            moveTimer = 0;
+            norchLeft.setX(norchLeft.getX() + 1);
+            norchRight.setX(norchRight.getX() + 1);
+        } else {
+            moveTimer = moveTimer + 1;
+            norchLeft.setX(norchLeft.getX() - 1);
+            norchRight.setX(norchRight.getX() - 1);
+        }
+        if(!releaseVirsion){
+            norchLeft.setText(getTimeDate() + " | T : " + gTotalFps + "FPS | N : " +
+                    gReceivedFps + "FPS | R : " + gRenderedFps + "FPS | " + getHz() + "Hz | P : " +
+                    gPing + "ms | P(V) : " + gVariance + " | L : " + gPacketLossPercentage +
+                    "% | set : " + (AppView.setBitrate / 1000) +
+                    "Mbps | Suggest : " + (short) suggestBitrate + "Mbps | D : " +
+                    (TrafficStats.getTotalRxBytes() - TotalRx) / 125000 + "Mbps | U : " +
+                    (TrafficStats.getTotalTxBytes() - TotalTx) / 125 + "Kbps");
+
+            norchRight.setText("AirAction FrameWork : "+ mSpenRemote.isConnected() + " | Button Service : " + airAction_IsButtonListening +
+                    " | Motion Service : " + airAction_IsMotionListening +" | D(c) : " + gDecodeTime + "ms | " +
+                    gResolutionWidth + " x " + gResolutionHeight + " | " + getBatteryCharge() + " | " +
+                    getBatteryPct() + " | " + setBitrate + " Mbps");
+
+        }
+    }
+
+    //서페이스 상태
+    @Override
+    public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
+        SurfaceViewState = true;
+
+        viewHeight = streamView.getHeight();
+        viewWidth = streamView.getWidth();
+        if (!surfaceCreated) {
+            throw new IllegalStateException("Surface changed before creation!");
+        }
+        if (!attemptedConnection) {
+            attemptedConnection = true;
+
+            decoderRenderer.setRenderTarget(holder);
+            conn.start(PlatformBinding.getAudioRenderer(), decoderRenderer,
+                    Game.this);
+        }
+    }
+    @Override
+    public void surfaceCreated(SurfaceHolder holder) {
+        surfaceCreated = true;
+        // Tell the OS about our frame rate to allow it to adapt the display refresh rate appropriately
+        holder.getSurface().setFrameRate(prefConfig.fps,
+                Surface.FRAME_RATE_COMPATIBILITY_FIXED_SOURCE);
+    }
+    @Override
+    public void surfaceDestroyed(SurfaceHolder holder) {
+        SurfaceViewState = false;
+        if (!surfaceCreated) {
+            throw new IllegalStateException("Surface destroyed before creation!");
+        }
+        if (attemptedConnection) {
+            // Let the decoder know immediately that the surface is gone
+            decoderRenderer.prepareForStop();
+
+            if (connected) {
+                stopConnection();
             }
         }
     }
 
-
-
-    //주사율 관련 설정
-    private boolean isRefreshRateGoodMatch(float refreshRate) {
-        return refreshRate >= prefConfig.fps &&
-                Math.round(refreshRate) % prefConfig.fps <= 3;
+    //시스템 ui모드 관련 함수
+    @Override
+    public void onSystemUiVisibilityChange(int visibility) {
+        // Don't do anything if we're not connected
+        if (!connected) {
+            return;
+        }
+        // This flag is set for all devices
+        if ((visibility & View.SYSTEM_UI_FLAG_FULLSCREEN) == 0) {
+            hideSystemUi(2000);
+        }
+        // This flag is only set on 4.4+
+        else if ((visibility & View.SYSTEM_UI_FLAG_HIDE_NAVIGATION) == 0) {
+            hideSystemUi(2000);
+        }
     }
 
+    //----------------------------------------------------------------------------------------------
+    //----------------------------------------------------------------------------------------------
+    // Decode
     //해상도 관련 설정
     private boolean shouldIgnoreInsetsForResolution(int width, int height) {
         // Never ignore insets for non-native resolutions
@@ -1035,8 +1346,8 @@ public class Game extends Activity implements SurfaceHolder.Callback,
             boolean resolutionFitsStream = candidate.getPhysicalWidth() >= prefConfig.width &&
                     candidate.getPhysicalHeight() >= prefConfig.height;
 
-            LimeLog.info("Examining display mode: "+candidate.getPhysicalWidth()+"x"+
-                    candidate.getPhysicalHeight()+"x"+candidate.getRefreshRate());
+            LimeLog.info("Examining display mode: " + candidate.getPhysicalWidth() + "x" +
+                    candidate.getPhysicalHeight() + "x" + candidate.getRefreshRate());
 
             if (candidate.getPhysicalWidth() > 4096 && prefConfig.width <= 4096) {
                 // Avoid resolutions options above 4K to be safe
@@ -1065,8 +1376,7 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                 if (refreshRateReduced || !isRefreshRateGoodMatch(candidate.getRefreshRate())) {
                     continue;
                 }
-            }
-            else if (!isRefreshRateGoodMatch(candidate.getRefreshRate())) {
+            } else if (!isRefreshRateGoodMatch(candidate.getRefreshRate())) {
                 // We didn't have a good match and this match isn't good either, so just don't
                 // reduce the refresh rate.
                 if (refreshRateReduced) {
@@ -1082,8 +1392,8 @@ public class Game extends Activity implements SurfaceHolder.Callback,
             bestMode = candidate;
             refreshRateIsGood = isRefreshRateGoodMatch(candidate.getRefreshRate());
         }
-        LimeLog.info("Selected display mode: "+bestMode.getPhysicalWidth()+"x"+
-                bestMode.getPhysicalHeight()+"x"+bestMode.getRefreshRate());
+        LimeLog.info("Selected display mode: " + bestMode.getPhysicalWidth() + "x" +
+                bestMode.getPhysicalHeight() + "x" + bestMode.getRefreshRate());
         windowLayoutParams.preferredDisplayModeId = bestMode.getModeId();
         displayRefreshRate = bestMode.getRefreshRate();
 
@@ -1100,120 +1410,195 @@ public class Game extends Activity implements SurfaceHolder.Callback,
         if (prefConfig.stretchVideo || aspectRatioMatch) {
             // Set the surface to the size of the video
             streamView.getHolder().setFixedSize(prefConfig.width, prefConfig.height);
-        }
-        else {
+        } else {
             // Set the surface to scale based on the aspect ratio of the stream
-            streamView.setDesiredAspectRatio((double)prefConfig.width / (double)prefConfig.height);
+            streamView.setDesiredAspectRatio((double) prefConfig.width / (double) prefConfig.height);
         }
-
         if (getPackageManager().hasSystemFeature(PackageManager.FEATURE_TELEVISION) ||
                 getPackageManager().hasSystemFeature(PackageManager.FEATURE_LEANBACK)) {
             // TVs may take a few moments to switch refresh rates, and we can probably assume
             // it will be eventually activated.
             // TODO: Improve this
             return displayRefreshRate;
-        }
-        else {
+        } else {
             // Use the actual refresh rate of the display, since the preferred refresh rate or mode
             // may not actually be applied (ex: Pixel 4 with Smooth Display disabled).
             return getWindowManager().getDefaultDisplay().getRefreshRate();
         }
     }
-
-
-
-    //시스템 UI 숨김 처리 함수
-    @SuppressLint("InlinedApi")
-    private final Runnable hideSystemUi = new Runnable() {
-        @Override
-        public void run() {
-            // TODO: Do we want to use WindowInsetsController here on R+ instead of
-            // SYSTEM_UI_FLAG_IMMERSIVE_STICKY? They seem to do the same thing as of S...
-
-            // In multi-window mode on N+, we need to drop our layout flags or we'll
-            // be drawing underneath the system UI.
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && isInMultiWindowMode()) {
-                Game.this.getWindow().getDecorView().setSystemUiVisibility(
-                        View.SYSTEM_UI_FLAG_LAYOUT_STABLE);
-            }
-            // Use immersive mode on 4.4+ or standard low profile on previous builds
-            else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
-                Game.this.getWindow().getDecorView().setSystemUiVisibility(
-                        View.SYSTEM_UI_FLAG_LAYOUT_STABLE |
-                                View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION |
-                                View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN |
-                                View.SYSTEM_UI_FLAG_HIDE_NAVIGATION |
-                                View.SYSTEM_UI_FLAG_FULLSCREEN |
-                                View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
-            }
-            else {
-                Game.this.getWindow().getDecorView().setSystemUiVisibility(
-                        View.SYSTEM_UI_FLAG_FULLSCREEN |
-                                View.SYSTEM_UI_FLAG_LOW_PROFILE);
-            }
-        }
-    };
-
-    //시스템 ui숨김처리 함수
-    private void hideSystemUi(int delay) {
-        Handler h = getWindow().getDecorView().getHandler();
-        if (h != null) {
-            h.removeCallbacks(hideSystemUi);
-            h.postDelayed(hideSystemUi, delay);
-        }
+    //주사율 관련 설정
+    private boolean isRefreshRateGoodMatch(float refreshRate) {
+        return refreshRate >= prefConfig.fps &&
+                Math.round(refreshRate) % prefConfig.fps <= 3;
     }
 
-    //멀티윈도우 관련 함수
-    @Override
-    public void onMultiWindowModeChanged(boolean isInMultiWindowMode) {
-        super.onMultiWindowModeChanged(isInMultiWindowMode);
+    //----------------------------------------------------------------------------------------------
+    //----------------------------------------------------------------------------------------------
+    //----------------------------------------------------------------------------------------------
+    // Input Integrated Management System
 
-        // In multi-window, we don't want to use the full-screen layout
-        // flag. It will cause us to collide with the system UI.
-        // This function will also be called for PiP so we can cover
-        // that case here too.
-        if (isInMultiWindowMode) {
-            getWindow().clearFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
+    // Input Service pool
 
-            // Disable performance optimizations for foreground
-            getWindow().setSustainedPerformanceMode(false);
-            decoderRenderer.notifyVideoBackground();
+    //S펜 에어액션
+    //S펜 Sdk 상태 확인
+    private void checkSdkInfo() {
+        Log.d(TAG, "VersionCode=" + mSpenRemote.getVersionCode());
+        Log.d(TAG, "versionName=" + mSpenRemote.getVersionName());
+        Log.d(TAG, "Support Button = " + mSpenRemote
+                .isFeatureEnabled(SpenRemote.FEATURE_TYPE_BUTTON));
+        Log.d(TAG, "Support Air motion = " + mSpenRemote
+                .isFeatureEnabled(SpenRemote.FEATURE_TYPE_AIR_MOTION));
+    }
+    //S펜 프레임워크 연결
+    private void connectToSpenRemote() {
+        //이미 연결되어있는지 반드시 확인해야 함
+        //확인하지 않으면 메서드가 응답하지 않음 (크래시 발생)
+        if (mSpenRemote.isConnected()) {
+            return;
+        }
+        //에어액션 상태 상태 리스너 등록
+        mSpenRemote.setConnectionStateChangeListener(new SpenRemote.ConnectionStateChangeListener() {
+            @Override
+            public void onChange(int state) {
+                // state
+                // SpenRemote.State.CONNECTED
+                // SpenRemote.State.DISCONNECTED  정상적인 disconnect 호출을 통한 연결해제
+                // SpenRemote.State.DISCONNECTED_BY_UNKNOWN_REASON
+            }
+        });
+        //S펜 연결 메서드
+        mSpenRemote.connect(this, mConnectionResultCallback);
+        //연결을 하지 않았으니 false임
+        airAction_IsButtonListening = false;
+        airAction_IsMotionListening = false;
+    }
+    //S펜 연결결과 콜백
+    private SpenRemote.ConnectionResultCallback mConnectionResultCallback = new SpenRemote.
+            ConnectionResultCallback() {
+        @Override
+        public void onSuccess(SpenUnitManager spenUnitManager) {
+            mSpenUnitManager = spenUnitManager;
+        }
+        @Override
+        public void onFailure(int i){
+            // i
+            // SpenRemote.Error.CONNECTION_FAILED S펜 프레임워크가 연결 거부신호를 보냄
+            // SpenRemote.Error.UNKNOWN
+            // SpenRemote.Error.UNSUPPORTED_DEVICE
+        }
+    };
+    //S펜 버튼 리스너 켜기
+    public void spenButtonConnectOn() {
+        if (!mSpenRemote.isConnected()) {
+            Log.d(TAG, "Spen FrameWork Not Connected");
+            return;
+        }
+
+        if (!airAction_IsButtonListening) {
+            Log.d(TAG, "register Button Listening");
+            SpenUnit buttonUnit = mSpenUnitManager.getUnit(SpenUnit.TYPE_BUTTON);
+            mSpenUnitManager.registerSpenEventListener(mButtonEventListener, buttonUnit);
+            airAction_IsButtonListening = true;
         }
         else {
-            getWindow().addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
-
-            // Enable performance optimizations for foreground
-            getWindow().setSustainedPerformanceMode(true);
-            decoderRenderer.notifyVideoForeground();
+            Log.d(TAG, "Already Button Listening");
         }
-
-        // Correct the system UI visibility flags
-        hideSystemUi(50);
+    }
+    //S펜 버튼 리스너 끄기
+    public void spenButtonConnectOff() {
+        if (!mSpenRemote.isConnected()) {
+            return;
+        }
+        if (airAction_IsButtonListening) {
+            SpenUnit buttonUnit = mSpenUnitManager.getUnit(SpenUnit.TYPE_BUTTON);
+            mSpenUnitManager.unregisterSpenEventListener(buttonUnit);
+            airAction_IsButtonListening = false;
+        }
+    }
+    //S펜 모션 켜기
+    public void spenMotionConnectOn() {
+        if (!mSpenRemote.isConnected()) {
+            return;
+        }
+        if (!airAction_IsMotionListening) {
+            SpenUnit airMotionUnit = mSpenUnitManager.getUnit(SpenUnit.TYPE_AIR_MOTION);
+            //바로 리스너 등록후 매니저 섹션으로 이동함
+            mSpenUnitManager.registerSpenEventListener(mAirMotionEventListener, airMotionUnit);
+            airAction_IsMotionListening = true;
+        }
+    }
+    //S펜 모션 끄기
+    public void spenMotionConnectOff() {
+        if (!mSpenRemote.isConnected()) {
+            return;
+        }
+        if (airAction_IsMotionListening) {
+            SpenUnit airMotionUnit = mSpenUnitManager.getUnit(SpenUnit.TYPE_AIR_MOTION);
+            mSpenUnitManager.unregisterSpenEventListener(airMotionUnit);
+            airAction_IsMotionListening = false;
+        }
+    }
+    //S펜 프레임워크 연결 해제
+    private void disconnectToSpenRemote() {
+        mSpenRemote.disconnect(mContext);
     }
 
-    //시스템 ui를 숨길 때 같이 호출되는 함수 인풋 캡쳐 관련함수
-    private final Runnable toggleGrab = new Runnable() {
-        @Override
-        public void run() {
-            if (grabbedInput) {
-                inputCaptureProvider.disableCapture();
-            }
-            else {
-                inputCaptureProvider.enableCapture();
-            }
+    private void airActionServiceReset(){
+        airAction_Mode = 0;
+        spenButtonConnectOff();
+        spenMotionConnectOff();
+    }
 
-            grabbedInput = !grabbedInput;
+    //----------------------------------------------------------------------------------------------
+    //포인터 캡쳐
+    //포인터 캡쳐 켜기
+    public void pointerCaptureOn(){
+        //streamView.requestPointerCapture();
+        streamView.setOnCapturedPointerListener(new View.OnCapturedPointerListener() {
+            @Override
+            public boolean onCapturedPointer(View view, MotionEvent motionEvent) {
+                return pointerCaptureInputManager(view, motionEvent);
+            }
+        });
+    }
+    //포인터 캡쳐 끄기
+    public void pointerCaptureOff(){
+        streamView.releasePointerCapture();
+    }
+    //----------------------------------------------------------------------------------------------
+    //접근성 키 이벤트
+    //접근성 키 켜기
+    public void accessibilityKeyOn(){
+        Log.d("KeyBoard","KeyBoardOn");
+        MyAccessibilityService.accessibilityKeyListening = true;
+    }
+    //접근성 키 끄기
+    public void accessibilityKeyOff(){
+        Log.d("KeyBoard","KeyBoardOff");
+        MyAccessibilityService.accessibilityKeyListening = false;
+    }
+    //----------------------------------------------------------------------------------------------
+    //----------------------------------------------------------------------------------------------
+    //Input Signal Manager pool
+    //키 입력 (접근성 버튼 -> OnKeyDown/Up 으로 전송됨)
+    //접근성 버튼 이벤트 수신기
+    public boolean accessibilityKeyManager(KeyEvent event) {
+        //화이트 리스트에 포함되어 있는지 확인합니다.
+        if (keyEventWhitelist(event)){
+            return false;
         }
-    };
-
-    //------------------------------------------------------------------
+        else {
+            return keyboardHandler(event);
+        }
+    }
     //버튼 다운 입력
     @Override
     public boolean onKeyDown(int keyCode, KeyEvent event) {
         super.onKeyDown(keyCode, event);
-        if (event.getKeyCode() == 24 ||event.getKeyCode() == 25 ){
+        if (keyEventWhitelist(event)){
             return false;
-        }else {
+        }
+        else {
             return true;
         }
     }
@@ -1221,380 +1606,376 @@ public class Game extends Activity implements SurfaceHolder.Callback,
     @Override
     public boolean onKeyUp(int keyCode, KeyEvent event) {
         super.onKeyUp(keyCode, event);
-        if (event.getKeyCode() == 24 ||event.getKeyCode() == 25 ){
+        if (keyEventWhitelist(event)){
             return false;
-        }else {
-            return true;
         }
-    }
-
-    //접근성 버튼 이벤트 수신기
-
-    public static boolean accessibilityKeyEvent(KeyEvent event){
-
-        if (event.getKeyCode() == 220 || event.getKeyCode() == 221 ||
-                event.getKeyCode() == 164 || event.getKeyCode() == 25 ||
-                event.getKeyCode() == 24 )
-        { return false; }
         else {
-            keyboardManager(event);
             return true;
         }
     }
+    // 키 이벤트 통합 화이트 리스트
+    public static boolean keyEventWhitelist(KeyEvent event){
+        switch (event.getKeyCode()){
+            case KeyEvent.KEYCODE_BRIGHTNESS_UP:
+            case KeyEvent.KEYCODE_BRIGHTNESS_DOWN:
+            case KeyEvent.KEYCODE_VOLUME_MUTE:
+            case KeyEvent.KEYCODE_VOLUME_DOWN:
+            case KeyEvent.KEYCODE_VOLUME_UP:
+                return true;
+            default:
+                return false;
+        }
+    }
 
-    //------------------------------------------------------------------
+    // 터치 키보드 인풋
+    @Override
+    public boolean handleKeyDown(KeyEvent event) {
+        return true;
+    }
+    @Override
+    public boolean handleKeyUp(KeyEvent event) {
+        return true;
+    }
+    //----------------------------------------------------------------------------------------------
+    //모션입력
     @Override
     public boolean onGenericMotionEvent(MotionEvent event) {
         return handleMotionEvent(null, event) || super.onGenericMotionEvent(event);
     }
-    //모션 입력
+    //포함되는 이벤트 : s펜 호버링
     @Override
     public boolean onGenericMotion(View view, MotionEvent event) {
-        //s펜 호버
-        return onGenericMotionManager(view, event);
-    }
-    //------------------------------------------------------------------
-    @Override
-    public boolean onTouchEvent(MotionEvent event) {
-        return handleMotionEvent(null, event) || super.onTouchEvent(event);
-    }
-    //터치 입력
-    @Override
-    public boolean onTouch(View view, MotionEvent event) {
-        //s펜 입력,화면터치
-        TouchView(event);
-        onTouchManager(view, event);
-        return handleMotionEvent(view, event);
-    }
-    //------------------------------------------------------------------
-
-    //에어액션 버튼 이벤트 리스너
-    private static SpenEventListener mButtonEventListener = new SpenEventListener() {
-        @Override
-        public void onEvent(SpenEvent event) {
-            ButtonEvent button = new ButtonEvent(event);
-            airActionButtonManager(button);
-        }
-    };
-
-    //에어액션 모션 이벤트 리스너
-    private static SpenEventListener mAirMotionEventListener = new SpenEventListener() {
-        @Override
-        public void onEvent(SpenEvent event) {
-            AirMotionEvent airMotion = new AirMotionEvent(event);
-            airActionMotionManger(airMotion);
-        }
-    };
-
-    //------------------------------------------------------------------
-
-    public boolean pointerCaptureInputManager (View view, MotionEvent event){
-        switch (event.getToolType(0)){
-            case MotionEvent.TOOL_TYPE_MOUSE:
-                mouseManager(view, event);
-                break;
-            case MotionEvent.TOOL_TYPE_FINGER:
-                trackPadManager(view, event);
-                break;
-            case MotionEvent.TOOL_TYPE_STYLUS:
-                streamView.releasePointerCapture();
-                break;
-            default:
-        }
-        return true;
-    }
-
-    public boolean onGenericMotionManager(View view, MotionEvent event){
-        switch (event.getToolType(0)){
+        switch (event.getToolType(0)) {
             case MotionEvent.TOOL_TYPE_MOUSE:
             case MotionEvent.TOOL_TYPE_FINGER:
                 streamView.requestPointerCapture();
                 break;
             case MotionEvent.TOOL_TYPE_STYLUS:
-                stylusManager(view, event);
+                streamView.releasePointerCapture();
+                stylusHandler(view, event);
                 break;
             default:
         }
-        return true;
+        return handleMotionEvent(view,event);
     }
+    //----------------------------------------------------------------------------------------------
+    //화면 터치 입력
+    @Override
+    public boolean onTouchEvent( MotionEvent event) {
 
-    public boolean onTouchManager(View view, MotionEvent event){
-        //s펜 터치입력
-        switch (event.getToolType(0)){
+        short eventY = 0 ;
+        if((event.getY()-(1848-(streamView.getHeight()))<0)){
+            eventY = (short) 0;
+        }
+        else {
+
+            eventY = (short) (event.getY()-(1848-(streamView.getHeight())));
+        }
+
+        System.out.println(streamView.getHeight());
+
+        mousePositionSender((short) event.getX() ,eventY);
+        //stylusHandler(null, event);
+
+
+
+        return handleMotionEvent(null, event) || super.onTouchEvent(event);
+    }
+    //포함되는 이벤트 : s펜 입력,화면터치
+    @SuppressLint("ClickableViewAccessibility")
+    @Override
+    public boolean onTouch(View view, MotionEvent event) {
+        //S펜 입력을 스타일러스 처리기로 보냅니다.
+        if (event.getToolType(0) == MotionEvent.TOOL_TYPE_STYLUS) {
+            stylusHandler(view, event);
+            return false;
+        }
+        return handleMotionEvent(view, event);
+    }
+    //----------------------------------------------------------------------------------------------
+    //에어액션
+    //에어액션 버튼 이벤트 리스너
+    private SpenEventListener mButtonEventListener = event -> {
+        ButtonEvent button = new ButtonEvent(event);
+        airActionButtonHandler(button);
+    };
+    //에어액션 모션 이벤트 리스너
+    private SpenEventListener mAirMotionEventListener = event -> {
+        AirMotionEvent airMotion = new AirMotionEvent(event);
+        airActionMoveHandler(airMotion);
+    };
+    //----------------------------------------------------------------------------------------------
+    //포인터 캡쳐
+    public boolean pointerCaptureInputManager(View view, MotionEvent event) {
+        switch (event.getToolType(0)) {
+            case MotionEvent.TOOL_TYPE_MOUSE:
+                mouseHandler(view, event);
+                break;
+            case MotionEvent.TOOL_TYPE_FINGER:
+                trackpadHandler(view, event);
+                break;
             case MotionEvent.TOOL_TYPE_STYLUS:
-                stylusManager(view, event);
+                //포인터 캡쳐 시스템이 완성되기 전까지 레거시 포인터 인풋을 사용합니다.
+                //streamView.releasePointerCapture();
                 break;
             default:
         }
         return true;
     }
+    //----------------------------------------------------------------------------------------------
+    //----------------------------------------------------------------------------------------------
+    // Input Sender Pool
 
-    public static void airActionButtonManager(ButtonEvent button){
-        AirMotionEvent airMotion = null;
-        airActionManager(button , airMotion);
-    }
-
-    public static void airActionMotionManger(AirMotionEvent airMotion){
-        motionDeltaX = airMotion.getDeltaX();
-        motionDeltaY = airMotion.getDeltaY();
-        motionData();
-        ButtonEvent button = null;
-        //airActionManager(button , airMotion);
-    }
-
-    //------------------------------------------------------------------
-
-    public static void keyboardDownSender(int keycode,byte Combination){
-        //키보드 다운 패킷 전송기
+    // 프로그램 구조상 가장 아래에 있어야 하지만 변환기의 함수가 너무길어 변환기 함수 위에 배치했습니다.
+    public static void keyboardDownSender(int keycode, byte Combination) {
         short translated = KeyboardTranslator.translate(keycode);
         conn.sendKeyboardInput(translated, KeyboardPacket.KEY_DOWN,
                 Combination);
     }
-
-    public static void keyboardUpSender(int keycode,byte Combination){
-        //키보드 업 패킷 전송기
+    public static void keyboardUpSender(int keycode, byte Combination) {
         short translated = KeyboardTranslator.translate(keycode);
-        conn.sendKeyboardInput(translated, KeyboardPacket.KEY_UP,Combination );
+        conn.sendKeyboardInput(translated, KeyboardPacket.KEY_UP, Combination);
     }
-    //------------------------------------------------------------------
-    public static void mousePositionSender (short x, short y, View view){
-        conn.sendMousePosition(x,y, (short)view.getWidth(), (short)view.getHeight());
+    public void mousePositionSender(short x, short y) {
+        conn.sendMousePosition(x, y,(short) viewWidth, (short) viewHeight);
     }
-    public static void mouseMoveSender (short DeltaX, short DeltaY){
+    public static float hz;
+    public static void mouseMoveSender(short DeltaX, short DeltaY) {
         conn.sendMouseMove(DeltaX, DeltaY);
     }
-    public static void mouseButtonDownSender(byte mouseButton){
+    public static void mouseButtonDownSender(byte mouseButton) {
         conn.sendMouseButtonDown(mouseButton);
     }
-    public static void mouseButtonUpSender (byte mouseButton){
+    public static void mouseButtonUpSender(byte mouseButton) {
         conn.sendMouseButtonUp(mouseButton);
     }
-    public static void mouseScrollSender(byte mouseScroll){
+    public static void mouseScrollSender(byte mouseScroll) {
         conn.sendMouseScroll(mouseScroll);
     }
-
-    //------------------------------------------------------------------
-
-    public static void keyboardManager(KeyEvent event){
-        if(event.getAction() == KeyEvent.ACTION_DOWN){
-            keyboardDownSender(event.getKeyCode(),(byte) MyAccessibilityService.modifieraaa);
+    //----------------------------------------------------------------------------------------------
+    //----------------------------------------------------------------------------------------------
+    // Input Signal Handler Pool
+    // 키 입력을 관리합니다.
+    // 시스템으로 보낼 키 입력은 인풋 신호 매니저에서 관리하세요
+    public boolean keyboardHandler(KeyEvent event) {
+        //키 이벤트를 송신기로 보냅니다.
+        //키 조합 변환기
+        if (event.getKeyCode() == KeyEvent.KEYCODE_SETTINGS) {
+            if (event.getAction() == KeyEvent.ACTION_DOWN) {
+                sendSettings();
+            }
         }
-        else if(event.getAction() == KeyEvent.ACTION_UP) {
-            keyboardUpSender(event.getKeyCode(),(byte) MyAccessibilityService.modifieraaa);
+        if (event.getKeyCode() == KeyEvent.KEYCODE_SYSRQ && event.getAction() == KeyEvent.ACTION_DOWN) {
+            sendScreenShot();
+            return true;
         }
+        //App1
+        if(event.getKeyCode() == 1090 && event.getAction() == KeyEvent.ACTION_DOWN){
+            sendExplorer();
+            return true;
+        }
+        //App2
+        if(event.getKeyCode() == 1091 && event.getAction() == KeyEvent.ACTION_DOWN){
+            return true;
+        }
+        //App3
+        if(event.getKeyCode() == 1092 && event.getAction() == KeyEvent.ACTION_DOWN){
+            return true;
+        }
+        //viewApp
+        if(event.getKeyCode() == 1004 && event.getAction() == KeyEvent.ACTION_DOWN){
+            return true;
+        }
+        //Finder
+        if (event.getKeyCode() == 1064 && event.getAction() == KeyEvent.ACTION_DOWN) {
+            sendSearch();
+            return true;
+        }
+        //Dex
+        if (event.getKeyCode() == 1084 && event.getAction() == KeyEvent.ACTION_DOWN) {
+            return true;
+        }
+        //북커버 View Keyboard 키 안드로이드 공식문서에 없음
+        if(event.getKeyCode() == 1006 && event.getAction() == KeyEvent.ACTION_DOWN){
+            airActionModeToggle();
+            return true;
+        }
+
+        // 키 이벤트를 보냅니다.
+        if (event.getAction() == KeyEvent.ACTION_DOWN) {
+            keyboardDownSender(event.getKeyCode(), keyBoardCombinationConverter(event));
+        } else if (event.getAction() == KeyEvent.ACTION_UP) {
+            keyboardUpSender(event.getKeyCode(), keyBoardCombinationConverter(event));
+        }
+        return true;
     }
 
-    public void mouseManager(View view, MotionEvent event){
-        //움직임 입력
+    // 마우스 입력을 관리합니다.
+    public void mouseHandler(View view, MotionEvent event) {
+        //움직임 송신
         mouseMoveSender((short) event.getAxisValue(MotionEvent.AXIS_RELATIVE_X),
-                (short)event.getAxisValue(MotionEvent.AXIS_RELATIVE_Y));
-        //버튼,스크롤 입력
-        switch (event.getAction()){
-            case  MotionEvent.ACTION_BUTTON_PRESS:
+                (short) event.getAxisValue(MotionEvent.AXIS_RELATIVE_Y));
+
+        //버튼,스크롤 송신
+        switch (event.getAction()) {
+            case MotionEvent.ACTION_BUTTON_PRESS:
+                // 안드로이드 키 신호를 문라이트 코어 시스템에 맞게 변환합니다.
                 mouseButtonDownSender(mouseButtonDownManager(view, event));
                 break;
-            case  MotionEvent.ACTION_BUTTON_RELEASE:
+            case MotionEvent.ACTION_BUTTON_RELEASE:
                 mouseButtonUpSender(mouseButtonUpManager(view, event));
                 break;
-            case  MotionEvent.ACTION_SCROLL:
+            case MotionEvent.ACTION_SCROLL:
                 mouseScrollSender((byte) event.getAxisValue(MotionEvent.AXIS_VSCROLL));
                 break;
         }
     }
-
-    //특수한 경우 : 매니저 시스템을 따르지 않음
-    public void trackPadManager(View view, MotionEvent event){
-        if(trackPadMove){
-            mouseMoveSender((short)event.getAxisValue(MotionEvent.AXIS_RELATIVE_Y),
-                    (short) -event.getAxisValue(MotionEvent.AXIS_RELATIVE_X));
-        }
+    // Raw 데이터 처리함수가 너무 길어 바로 변환기로 보냅니다
+    // 프로그램 구조를 명확히 하기위해 중간 연결 메서드를 만들어 둡니다.
+    public void trackpadHandler(View view, MotionEvent event){
         trackpadConverter(view,event);
     }
-
-    public static void stylusManager(View view, MotionEvent event){
-        mousePositionSender((short) event.getX(),(short) event.getY(),view);
+    //현재 위치요소만 있습니다.
+    //버튼 입력은 현재 레거시 시스템에 의존하고 있습니다.
+    //포인터 캡쳐 기반으로 변경되면 이 메서드에 추가하십시오
+    public void stylusHandler(View view, MotionEvent event) {
+        mousePositionSender((short) (event.getX()),(short) (event.getY()));
+    }
+    // Raw 데이터 처리함수가 너무 길어 바로 변환기로 보냅니다
+    // 프로그램 구조를 명확히 하기위해 중간 연결 메서드를 만들어 둡니다.
+    public void airActionButtonHandler(ButtonEvent button) {
+        airActionConverter(button);
+    }
+    public void airActionMoveHandler(AirMotionEvent airMotion) {
+        if (airAction_Move) {
+            mouseMoveSender((short) (airMotion.getDeltaX() * airAction_MoveSpeed),
+                    (short)(airMotion.getDeltaY() * -airAction_MoveSpeed));
+        }
+    }
+    //----------------------------------------------------------------------------------------------
+    //----------------------------------------------------------------------------------------------
+    // Input Data Converter
+    public static byte keyBoardCombinationConverter(KeyEvent event){
+        //키 조합을 Geforce 프로토콜에 맞게 설정합니다.
+        if (event.getKeyCode() == KeyEvent.KEYCODE_SHIFT_LEFT ||
+                event.getKeyCode() == KeyEvent.KEYCODE_SHIFT_RIGHT){
+            if (event.getAction() == KeyEvent.ACTION_DOWN) {
+                switch (KeyCombination){
+                    case 0: case 2: case 4: case 6: case 8: case 10: case 14:
+                        KeyCombination = KeyCombination+1;
+                        break;
+                }
+            }
+            if (event.getAction() == KeyEvent.ACTION_UP) {
+                switch (KeyCombination){
+                    case 1: case 3: case 5: case 7: case 9: case 11: case 15:
+                        KeyCombination = KeyCombination-1;
+                        break;
+                }
+            }
+        }
+        if (event.getKeyCode() == KeyEvent.KEYCODE_CTRL_RIGHT ||
+                event.getKeyCode() == KeyEvent.KEYCODE_CTRL_LEFT){
+            if (event.getAction() == KeyEvent.ACTION_DOWN) {
+                switch (KeyCombination){
+                    case 0: case 1: case 4: case 5: case 8: case 9: case 13:
+                        KeyCombination = KeyCombination+2;
+                        break;
+                }
+            }
+            if (event.getAction() == KeyEvent.ACTION_UP) {
+                switch (KeyCombination){
+                    case 2: case 3: case 6: case 7: case 10: case 11: case 14: case 15:
+                        KeyCombination = KeyCombination-2;
+                        break;
+                }
+            }
+        }
+        if (event.getKeyCode() == KeyEvent.KEYCODE_ALT_LEFT ||
+                event.getKeyCode() == KeyEvent.KEYCODE_ALT_RIGHT){
+            if (event.getAction() == KeyEvent.ACTION_DOWN) {
+                switch (KeyCombination){
+                    case 0: case 1: case 2: case 3: case 8: case 9: case 10: case 11:
+                        KeyCombination = KeyCombination+4;
+                        break;
+                }
+            }
+            if (event.getAction() == KeyEvent.ACTION_UP) {
+                switch (KeyCombination){
+                    case 4: case 5: case 6: case 7: case 11: case 12: case 13: case 15:
+                        KeyCombination = KeyCombination-4;
+                        break;
+                }
+            }
+        }
+        if (event.getKeyCode() == KeyEvent.KEYCODE_META_LEFT ||
+                event.getKeyCode() == KeyEvent.KEYCODE_META_RIGHT){
+            if (event.getAction() == KeyEvent.ACTION_DOWN) {
+                if(KeyCombination >= 0 && KeyCombination <= 7){
+                    KeyCombination =KeyCombination+ 8;
+                }
+            }
+            else if (event.getAction() == KeyEvent.ACTION_UP) {
+                if(KeyCombination >= 8 && KeyCombination <= 15 ){
+                    KeyCombination = KeyCombination - 8;
+                }
+            }
+        }
+        return (byte) KeyCombination;
     }
 
-    public static void airActionManager(ButtonEvent button, AirMotionEvent airMotion){
-
-        if (button.getAction() == ButtonEvent.ACTION_DOWN) {
-            spenButtonStatus = true;
-            if(MyAccessibilityService.airActionMode == 1){
-                spenMotionsend = true;
-                conn.sendKeyboardInput(KeyboardTranslator.translate(KeyEvent.KEYCODE_CTRL_LEFT),
-                        KeyboardPacket.KEY_DOWN, (byte) 0x02);
-                conn.sendKeyboardInput(KeyboardTranslator.translate(KeyEvent.KEYCODE_L),
-                        KeyboardPacket.KEY_DOWN, (byte)0x02);
-                conn.sendKeyboardInput(KeyboardTranslator.translate(KeyEvent.KEYCODE_L),
-                        KeyboardPacket.KEY_UP, (byte)0x02);
-                conn.sendKeyboardInput(KeyboardTranslator.translate(KeyEvent.KEYCODE_CTRL_LEFT),
-                        KeyboardPacket.KEY_UP, (byte)0);
-                spenMotionConnectOn();
-                conn.sendMousePosition((short) 1400, (short) 800, (short) 2960, (short) 1820);
-            }
-            //마우스 모드
-            if(MyAccessibilityService.airActionMode == 2){
-                //패킷전송 켬
-                if( spenDelay!= null){
-                    spenDelay.cancel();
-                    spenDelay = null;
-                }
-                spenDelay = new Timer(true);
-                spenDelay.schedule(new TimerTask() {
-                    @Override
-                    public void run() {
-                        spenMotionsend = true;
-                    }
-                }, 200);
-
-                //모션 켬
-                spenMotionConnectOn();
-                //타이머 끔
-                if(spenMotionOffTimer!=null){
-                    spenMotionOffTimer.cancel();
-                    spenMotionOffTimer=null;
-                }
-                spenButtonDownTime = SystemClock.uptimeMillis();
-
-                if(touchQueue) {
-                    //200ms 초과 : 드래그 후 마우스 떼는것
-                    if ((SystemClock.uptimeMillis() - touchUpTime) > 300) {
-                        conn.sendMouseButtonUp(MouseButtonPacket.BUTTON_LEFT);
-                        touchQueue=false;
-                    }
-                    //200ms 미만
-                    if ((SystemClock.uptimeMillis() - touchUpTime) < 300) {
-                        //터치다운 시간 기록
-                        spenButtonDownTime = SystemClock.uptimeMillis();
-
-                        //클릭 타이머 취소
-                        if(mouseClick!=null){
-                            mouseClick.cancel();
-                            mouseClick=null;
-                        }
-                    }
-                }
-                mouseDownStatus = true;
-            }
-
-            //제스쳐모드
-            if(MyAccessibilityService.airActionMode == 3){
-                spenMotionConnectOn();
-                spenMotionsend = false;
-            }
-        }
-
-        //버튼 업
-        if (button.getAction() == ButtonEvent.ACTION_UP) {
-            spenButtonStatus = false;
-            if(MyAccessibilityService.airActionMode == 1) {
-                spenMotionsend = false;
-                spenMotionConnectOff();
-                conn.sendMousePosition((short) 2960, (short) 1820, (short) 2960, (short) 1820);
-                conn.sendKeyboardInput(KeyboardTranslator.translate(KeyEvent.KEYCODE_CTRL_LEFT), KeyboardPacket.KEY_DOWN, (byte) 0x02);
-                conn.sendKeyboardInput(KeyboardTranslator.translate(KeyEvent.KEYCODE_L), KeyboardPacket.KEY_DOWN, (byte) 0x02);
-                conn.sendKeyboardInput(KeyboardTranslator.translate(KeyEvent.KEYCODE_L), KeyboardPacket.KEY_UP, (byte) 0x02);
-                conn.sendKeyboardInput(KeyboardTranslator.translate(KeyEvent.KEYCODE_CTRL_LEFT), KeyboardPacket.KEY_UP, (byte) 0);
-            }
-            if(MyAccessibilityService.airActionMode == 2){
-                //패킷전송 끔
-
-                if(spenDelay!=null) {
-                    spenDelay.cancel();
-                    spenDelay=null;
-                }
-                spenMotionsend = false;
-
-                if( spenMotionOffTimer!= null){
-                    spenMotionOffTimer.cancel();
-                    spenMotionOffTimer = null;
-                }
-                spenMotionOffTimer = new Timer(true);
-                spenMotionOffTimer.schedule(new TimerTask() {
-                    @Override
-                    public void run() {
-                        spenMotionConnectOff();
-                    }
-                }, 5000);
-
-                if(!touchQueue) {
-                    //터치 다운 후 100미만
-                    if ((SystemClock.uptimeMillis() - spenButtonDownTime) < 200) {
-                        mouseButtonDownSender(MouseButtonPacket.BUTTON_LEFT);
-                        touchUpTime = SystemClock.uptimeMillis();
-                        touchQueue = true;
-                    }
-                    //터치 다운 후 100초과
-                    if ((SystemClock.uptimeMillis() - spenButtonDownTime) > 200) {
-                        //드래그 중
-                    }
-                    //터치 다운 후 100미만  200ms 후에도 터치 다운 이벤트 없음
-                    if((SystemClock.uptimeMillis() - spenButtonDownTime) < 200){
-
-                        if( mouseClick!= null){
-                            mouseClick.cancel();
-                            mouseClick = null;
-                        }
-
-                        mouseClick = new Timer(true);
-                        mouseClick.schedule(new TimerTask() {
-                            @Override
-                            public void run() {
-                                conn.sendMouseButtonUp(MouseButtonPacket.BUTTON_LEFT);
-                                touchQueue = false;
-                            }
-                        }, 200);
-                    }
-                }
-                else {
-                    //200ms 미만 : 클릭
-                    if((SystemClock.uptimeMillis() -spenButtonDownTime)<200){
-                        conn.sendMouseButtonUp(MouseButtonPacket.BUTTON_LEFT);
-                        mouseButtonDownSender(MouseButtonPacket.BUTTON_LEFT);
-                        conn.sendMouseButtonUp(MouseButtonPacket.BUTTON_LEFT);
-                        touchQueue = false;
-                    }
-                    //200ms 초과
-                    if((SystemClock.uptimeMillis() -spenButtonDownTime) >200){
-                        conn.sendMouseButtonUp(MouseButtonPacket.BUTTON_LEFT);
-                        touchQueue = false;
-                    }
-                }
-                mouseDownStatus = false;
-            }
-            //제스쳐모드
-            if(MyAccessibilityService.airActionMode == 3){
-                if( spenMotionOffTimer!= null){
-                    spenMotionOffTimer.cancel();
-                    spenMotionOffTimer = null;
-                }
-                spenMotionOffTimer = new Timer(true);
-                spenMotionOffTimer.schedule(new TimerTask() {
-                    @Override
-                    public void run() {
-                        spenMotionConnectOff();
-                    }
-                }, 5000);
-            }
-            BUTTONSTATEUP = true;
-            BUTTONSTATEDOWN = false;
-            ONEClick = true;
-        }
-        switch (MyAccessibilityService.airActionMode){
-            case 0:
-                break;
-            case 1:
-                break;
-            case 2:
-                break;
-            case 3:
-                break;
-        }
-
+    // 키보드 이벤트
+    public static void sendShortcutKey(int keycode, byte keyState, byte modifier) {
+        short translated = KeyboardTranslator.translate(keycode);
+        conn.sendKeyboardInput(translated,
+                keyState, modifier);
     }
 
-    //------------------------------------------------
-    public byte mouseButtonDownManager(View view, MotionEvent event){
+    public void sendWinTap() {
+        sendShortcutKey(KeyEvent.KEYCODE_META_LEFT, KeyboardPacket.KEY_DOWN, (byte) 0x08);
+        sendShortcutKey(KeyEvent.KEYCODE_TAB, KeyboardPacket.KEY_DOWN, (byte) 0x08);
+        sendShortcutKey(KeyEvent.KEYCODE_TAB, KeyboardPacket.KEY_UP, (byte) 0x0);
+        sendShortcutKey(KeyEvent.KEYCODE_META_LEFT, KeyboardPacket.KEY_UP, (byte) 0x0);
+    }
+
+    public void sendScreenShot() {
+        sendShortcutKey(KeyEvent.KEYCODE_META_LEFT, KeyboardPacket.KEY_DOWN, (byte) 0x08);
+        sendShortcutKey(KeyEvent.KEYCODE_SHIFT_LEFT, KeyboardPacket.KEY_DOWN, (byte) 0x09);
+        sendShortcutKey(KeyEvent.KEYCODE_S, KeyboardPacket.KEY_DOWN, (byte) 0x09);
+        sendShortcutKey(KeyEvent.KEYCODE_S, KeyboardPacket.KEY_UP, (byte) 0x09);
+        sendShortcutKey(KeyEvent.KEYCODE_SHIFT_LEFT, KeyboardPacket.KEY_UP, (byte) 0x08);
+        sendShortcutKey(KeyEvent.KEYCODE_META_LEFT, KeyboardPacket.KEY_UP, (byte) 0x0);
+    }
+
+    public void sendSearch() {
+        sendShortcutKey(KeyEvent.KEYCODE_META_LEFT, KeyboardPacket.KEY_DOWN, (byte) 0x08);
+        sendShortcutKey(KeyEvent.KEYCODE_S, KeyboardPacket.KEY_DOWN, (byte) 0x08);
+        sendShortcutKey(KeyEvent.KEYCODE_S, KeyboardPacket.KEY_UP, (byte) 0x08);
+        sendShortcutKey(KeyEvent.KEYCODE_META_LEFT, KeyboardPacket.KEY_UP, (byte) 0x0);
+    }
+
+    public void sendExplorer() {
+        sendShortcutKey(KeyEvent.KEYCODE_META_LEFT, KeyboardPacket.KEY_DOWN, (byte) 0x08);
+        sendShortcutKey(KeyEvent.KEYCODE_E, KeyboardPacket.KEY_DOWN, (byte) 0x08);
+        sendShortcutKey(KeyEvent.KEYCODE_E, KeyboardPacket.KEY_UP, (byte) 0x08);
+        sendShortcutKey(KeyEvent.KEYCODE_META_LEFT, KeyboardPacket.KEY_UP, (byte) 0x0);
+    }
+
+    public void sendSettings() {
+        sendShortcutKey(KeyEvent.KEYCODE_META_LEFT, KeyboardPacket.KEY_DOWN, (byte) 0x08);
+        sendShortcutKey(KeyEvent.KEYCODE_I, KeyboardPacket.KEY_DOWN, (byte) 0x08);
+        sendShortcutKey(KeyEvent.KEYCODE_I, KeyboardPacket.KEY_UP, (byte) 0x08);
+        sendShortcutKey(KeyEvent.KEYCODE_META_LEFT, KeyboardPacket.KEY_UP, (byte) 0x0);
+    }
+
+    public void sendDesktop() {
+        sendShortcutKey(KeyEvent.KEYCODE_META_LEFT, KeyboardPacket.KEY_DOWN, (byte) 0x08);
+        sendShortcutKey(KeyEvent.KEYCODE_D, KeyboardPacket.KEY_DOWN, (byte) 0x08);
+        sendShortcutKey(KeyEvent.KEYCODE_D, KeyboardPacket.KEY_UP, (byte) 0x0);
+        sendShortcutKey(KeyEvent.KEYCODE_META_LEFT, KeyboardPacket.KEY_UP, (byte) 0x0);
+    }
+    //마우스 버튼 다중 입력 신호 변환기
+    public byte mouseButtonDownManager(View view, MotionEvent event) {
         byte buttonIndex = 0x00;
         if (event.getAction() == MotionEvent.ACTION_BUTTON_PRESS) {
             switch (event.getButtonState() - lastButtonDown) {
@@ -1618,8 +1999,7 @@ public class Game extends Activity implements SurfaceHolder.Callback,
         }
         return buttonIndex;
     }
-
-    public byte mouseButtonUpManager(View view, MotionEvent event){
+    public byte mouseButtonUpManager(View view, MotionEvent event) {
         byte buttonIndex = 0x00;
         if (event.getAction() == MotionEvent.ACTION_BUTTON_RELEASE) {
             switch (lastButtonDown - event.getButtonState()) {
@@ -1643,159 +2023,195 @@ public class Game extends Activity implements SurfaceHolder.Callback,
         }
         return buttonIndex;
     }
-
-    public void trackpadConverter(View view, MotionEvent event){
-        if(event.getPointerCount()==1){
-            if(event.getAction()== MotionEvent.ACTION_DOWN){
-                if(touchQueue) {
-                    //200ms 초과 : 드래그 후 마우스 떼는것
-                    if ((SystemClock.uptimeMillis() - touchUpTime) > 200) {
+    //----------------------------------------------------------------------------------------------
+    //트랙패드 입력을 관리합니다.
+    public void trackpadConverter(View view, MotionEvent event) {
+        // 트랙패드 움직임 전송
+        if (trackPad_Move) {
+            mouseMoveSender((short) event.getAxisValue(MotionEvent.AXIS_RELATIVE_Y),
+                    (short) -event.getAxisValue(MotionEvent.AXIS_RELATIVE_X));
+        }
+        // 손가락이 1개일때
+        if (event.getPointerCount() == 1) {
+            // 손가락이 1개일때 버튼 처리 : 마우스와 동일하게 작동
+            switch (event.getAction()) {
+                case MotionEvent.ACTION_BUTTON_PRESS:
+                    mouseButtonDownSender(mouseButtonDownManager(view, event));
+                    break;
+                case MotionEvent.ACTION_BUTTON_RELEASE:
+                    mouseButtonUpSender(mouseButtonUpManager(view, event));
+                    break;
+            }
+            // 손가락이 닿을때
+            if (event.getAction() == MotionEvent.ACTION_DOWN) {
+                // 터치다운 시간 기록됨
+                // 처음 닿을때에는 클릭 이벤트가 작동하지 않습니다.
+                if (trackPad_Single_EventQueue) {
+                    //포인터 이동과 클릭를 구분합니다.
+                    if ((SystemClock.uptimeMillis() - touchUpTime) > trackPad_TapEventThreshold) {
                         mouseButtonDownSender(MouseButtonPacket.BUTTON_LEFT);
-                        touchQueue=false;
+                        trackPad_Single_EventQueue = false;
                     }
-                    //200ms 미만
-                    if ((SystemClock.uptimeMillis() - touchUpTime) < 200) {
-                        //터치다운 시간 기록됨
-                        //클릭 타이머 취소
-                        if(mouseClick!=null){
-                            mouseClick.cancel();
-                            mouseClick=null;
+                    //클릭과, 한번 탭 후 드래그를 구분합니다.
+                    if ((SystemClock.uptimeMillis() - touchUpTime) < trackPad_TapEventThreshold) {
+                        // 한번 탭 후 드래그 입니다.
+                        // 클릭 이벤트 타이머를 취소합니다.
+                        if (trackPad_Single_TapClick != null) {
+                            trackPad_Single_TapClick.cancel();
+                            trackPad_Single_TapClick = null;
                         }
                     }
                 }
-                trackPadTouchDownStatus=true;
-                lastPadDragStartX = event.getRawX();
-                lastPadDragStartY = event.getRawY();
-                mouseDownStatus = true;
+
+                trackPad_Single_DownStatus = true;
                 padMoveStatus = false;
+
+                // 손가락이 닿을때 절대 위치를 기록합니다.
+                // 자동이동메서드의 방향 구분에 사용됩니다.
+                trackPad_Single_StartRawX = event.getRawX();
+                trackPad_Single_StartRawY = event.getRawY();
             }
 
-            if(event.getAction()== MotionEvent.ACTION_UP){
-                if(!touchQueue) {
+            //손가락이 떨어질 때
+            if (event.getAction() == MotionEvent.ACTION_UP) {
+                if (!trackPad_Single_EventQueue) {
                     //터치 다운 후 100미만
                     if ((SystemClock.uptimeMillis() - event.getDownTime()) < 70) {
                         mouseButtonDownSender(MouseButtonPacket.BUTTON_LEFT);
                         touchUpTime = SystemClock.uptimeMillis();
-                        touchQueue = true;
+                        trackPad_Single_EventQueue = true;
                     }
                     //터치 다운 후 100초과
                     if ((SystemClock.uptimeMillis() - event.getDownTime()) > 70) {
                         //드래그 중
                     }
                     //터치 다운 후 100미만  200ms 후에도 터치 다운 이벤트 없음
-                    if((SystemClock.uptimeMillis() - event.getDownTime()) < 70){
-                        if(mouseClick != null){
-                            mouseClick.cancel();
-                            mouseClick = null;
-                        }
-                        mouseClick = new Timer(true);
-                        mouseClick.schedule(new TimerTask() {
+                    if ((SystemClock.uptimeMillis() - event.getDownTime()) < 70) {
+                        trackPad_Single_TapClick = new Timer(true);
+                        trackPad_Single_TapClick.schedule(new TimerTask() {
                             @Override
                             public void run() {
                                 mouseButtonUpSender(MouseButtonPacket.BUTTON_LEFT);
-                                touchQueue = false;
+                                trackPad_Single_EventQueue = false;
                             }
-                        }, 200);
+                        }, trackPad_TapEventThreshold);
                     }
-                }
-                else if(touchQueue){
+                } else if (trackPad_Single_EventQueue) {
                     //200ms 미만 : 클릭
-                    if((SystemClock.uptimeMillis() -event.getDownTime()) <200){
+                    if ((SystemClock.uptimeMillis() - event.getDownTime()) < 200) {
                         mouseButtonUpSender(MouseButtonPacket.BUTTON_LEFT);
                         mouseButtonDownSender(MouseButtonPacket.BUTTON_LEFT);
                         mouseButtonUpSender(MouseButtonPacket.BUTTON_LEFT);
-                        touchQueue = false;
+                        trackPad_Single_EventQueue = false;
                     }
-                    if((SystemClock.uptimeMillis() -event.getDownTime()) >200){
+                    if ((SystemClock.uptimeMillis() - event.getDownTime()) > 200) {
                         mouseButtonUpSender(MouseButtonPacket.BUTTON_LEFT);
-
-                        touchQueue = false;
+                        trackPad_Single_EventQueue = false;
                     }
                 }
-                trackPadReset(view,event);
+                trackPad_Global_One_Time_Event = false;
+                trackPadReset(view, event);
             }
-            //드래그
-            //방향성 결정
-            dragRight = (event.getRawY()-lastPadDragStartY );
-            dragLeft = -(event.getRawY()-lastPadDragStartY);
-            dragUp = (event.getRawX()-lastPadDragStartX);
-            dragDown = -(event.getRawX()-lastPadDragStartX);
 
-            if(dragRight > dragLeft && dragRight > dragUp  &&
-                    dragRight > dragDown){
-                moveDirection=1;
+            // 드래그
+            // 자동이동 방향 결정
+            float dragRightLength = (event.getRawY() - trackPad_Single_StartRawY);
+            float dragLeftLength = -(event.getRawY() - trackPad_Single_StartRawY);
+            float dragUpLength = (event.getRawX() - trackPad_Single_StartRawX);
+            float dragDownLength = -(event.getRawX() - trackPad_Single_StartRawX);
+
+            // 포인터 자동이동 방향
+            short autoMoveDirection = 0;
+            if (dragRightLength > dragLeftLength && dragRightLength > dragUpLength &&
+                    dragRightLength > dragDownLength) {
+                autoMoveDirection = 1;
             }
-            if(dragLeft > dragRight && dragLeft > dragUp  &&
-                    dragLeft > dragDown){
-                moveDirection=2;
+            if (dragLeftLength > dragRightLength && dragLeftLength > dragUpLength &&
+                    dragLeftLength > dragDownLength) {
+                autoMoveDirection = 2;
             }
-            if(dragUp > dragLeft && dragUp > dragRight  &&
-                    dragUp > dragDown){
-                moveDirection=3;
+            if (dragUpLength > dragLeftLength && dragUpLength > dragRightLength &&
+                    dragUpLength > dragDownLength) {
+                autoMoveDirection = 3;
             }
-            if(dragDown > dragLeft && dragDown > dragUp  &&
-                    dragDown > dragRight){
-                moveDirection=4;
+            if (dragDownLength > dragLeftLength && dragDownLength > dragUpLength &&
+                    dragDownLength > dragRightLength) {
+                autoMoveDirection = 4;
             }
 
             //움직임 상태확인
-            //자동 움직임이 황성화 되면 움직임 신호를 멈춤
+            //자동 움직임이 활성화 되면 움직임 신호를 멈춤
             if (!padMoveStatus) {
                 //패드 타이머를 끈다
                 padTimer = false;
             }
 
-            if(((event.getRawX()-lastPadDragX) > 5 || (event.getRawX()-lastPadDragX) < -5)||
-                    ((event.getRawY()-lastPadDragY) > 5 || (event.getRawY()-lastPadDragY) < -5)) {
+            //속도
+            //손가락이 멈출때를 감지합니다.
+            //멈추고 1초 뒤입니다.
+            //영역 도달후 1초뒤가 아닙니다.
+            if (((event.getRawX() - trackPad_Single_EndRawX) > 5 || (event.getRawX() - trackPad_Single_EndRawX) < -5) ||
+                    ((event.getRawY() - trackPad_Single_EndRawY) > 5 || (event.getRawY() - trackPad_Single_EndRawY) < -5)) {
                 padTimer = false;
+                //빠른속도로 포인터를 움직이면 취소됩니다.
                 if (tapDownTimer != null) {
                     tapDownTimer.cancel();
                     tapDownTimer = null;
                 }
-            }
-            else {
+            } else {
                 //패드타이머를 켭니다.
-                if(!padTimer){
+                if (!padTimer) {
                     padTimer = true;
-                    //가장자리 갔을때문 활성화
-                    if(event.getRawX()<900||event.getRawX()>1500 ||
-                            event.getRawY()>1500|| event.getRawY()<100) {
-                        dragPadPointerCapture(view, event);
+                    //가장자리 갔을때만 활성화
+                    //(TABS7 PLUS) event.getRawX()<900
+                    //(TABS7 PLUS) event.getRawY()<1500
+                    if (event.getRawX() < 590 || event.getRawX() > 1500 ||
+                            event.getRawY() > 1700 || event.getRawY() < 100) {
+                        stopAutoMove = false;
+                        dragPadPointerCapture(autoMoveDirection);
+                    } else {
+                        padTimer = false;
+                        padMoveStatus = false;
+                        stopAutoMove = true;
                     }
                 }
             }
-            lastPadDragX = event.getRawX();
-            lastPadDragY = event.getRawY();
+            trackPad_Single_EndRawX = event.getRawX();
+            trackPad_Single_EndRawY = event.getRawY();
         }
         //손가락 갯수 2개
-        if(event.getPointerCount() == 2){
-            if(event.getButtonState()==1){
-                trackPadScrollButton = true;
-                trackPadMove = true;
+        if (event.getPointerCount() == 2) {
+            if (event.getButtonState() == 1) {
+                trackPad_Double_Mode = 1;
+                trackPad_Move = true;
                 conn.sendMouseButtonDown(MouseButtonPacket.BUTTON_MIDDLE);
             }
+
             //터치 업
-            if(event.getAction() == 262 || event.getAction() == 6)
-            {
-                //100ms 이내
-                if((SystemClock.uptimeMillis() -event.getDownTime()) <100){
+            //마우스 오른쪽 버튼
+            if (event.getAction() == 262 || event.getAction() == 6) {
+                //100ms 이내로 마우스가 떨어지면
+                if ((SystemClock.uptimeMillis() - event.getDownTime()) < 100) {
                     conn.sendMouseButtonDown(MouseButtonPacket.BUTTON_RIGHT);
                     conn.sendMouseButtonUp(MouseButtonPacket.BUTTON_RIGHT);
                     //스크롤 큐 끔
-                    scrollQueue = false;
-                    trackPadMove = true;
+                    trackPad_Double_One_Time_Event = false;
+                    trackPad_Move = true;
                 }
-                trackPadReset(view,event);
+                trackPad_Global_One_Time_Event = false;
+                trackPadReset(view, event);
             }
             //터치다운
-            if(event.getAction() == 261){
+            if (event.getAction() == 261) {
                 //포인터 이동 막기
-                trackPadMove = false;
-                if(!scrollQueue){
+                trackPad_Move = false;
+
+                //단일 이벤트
+                if (!trackPad_Double_One_Time_Event) {
                     //스크롤 큐 켬
-                    scrollQueue = true;
+                    trackPad_Double_One_Time_Event = true;
                     //점과 점 사이 거리 기록
-                    dotToDotLength = (float) Math.sqrt(Math.pow(event.getX(0)-
+                    trackPad_Double_Start_PointToPointDistance = (float) Math.sqrt(Math.pow(event.getX(0) -
                             event.getX(1), 2) + Math.pow(event.getY(0) - event.getY(1), 2));
                     //처음 위치 기록
                     PadScroll = event.getRawX();
@@ -1804,60 +2220,55 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                             event.getX(1), 2) + Math.pow(event.getY(0) -
                             event.getY(1), 2));
                 }
-                trackPadTouchDownStatus=true;
             }
-            if(!trackPadScrollButton) {
+            //모드 설정 안됨
+            if (trackPad_Double_Mode == 0 ) {
                 //두 손가락 드래그 상태
-                if (scrollQueue) {
-                    if (scrollMode) {
+                if (trackPad_Double_One_Time_Event) {
+                    if (trackPad_Double_Mode_0 == 0) {
                         //상하 스크롤모드
                         //현재 위치- 처음위치 1번 이동
-                        if (!landMode) {
-                            conn.sendMouseHighResScroll((short) ((PadScroll - event.getRawX()) * 5));
-                            PadScroll = event.getRawX();
-                            if ((event.getRawY() - PadScrollY) > 150 || (event.getRawY() - PadScrollY) < -150) {
-                                landMode = true;
-                                PadScrollY = event.getRawY();
-                            }
+                        conn.sendMouseHighResScroll((short) ((PadScroll - event.getRawX()) * 3));
+                        PadScroll = event.getRawX();
+                        if ((event.getRawY() - PadScrollY) > 150 || (event.getRawY() - PadScrollY) < -150) {
+                            trackPad_Double_Mode_0 = 1;
+                            PadScrollY = event.getRawY();
                         }
-                        //좌우 스크롤
-                        if (landMode) {
 
-                            //드래그속도
-                            if (((event.getRawY() - lastPadDragY) < 25 && (event.getRawY() - lastPadDragY) > -25)) {
-                                conn.sendKeyboardInput((short) 0xA0, KeyboardPacket.KEY_DOWN, (byte) 0);
-                                conn.sendMouseHighResScroll((short) ((event.getRawY() - PadScrollY) * 5));
-                                PadScrollY = event.getRawY();
-                            } else {
-                                if (trackPadTouchDownStatus) {
-                                    //가장자리
-                                    if (event.getRawY() < 150) {
-                                        conn.sendMouseButtonDown(MouseButtonPacket.BUTTON_X1);
-                                        conn.sendMouseButtonUp(MouseButtonPacket.BUTTON_X1);
-                                        trackPadTouchDownStatus = false;
-                                    }
-                                    if (event.getRawY() > 1450) {
-                                        conn.sendMouseButtonDown(MouseButtonPacket.BUTTON_X2);
-                                        conn.sendMouseButtonUp(MouseButtonPacket.BUTTON_X2);
-                                        trackPadTouchDownStatus = false;
-                                    }
-                                }
-                            }
-                        }
-                        lastPadDragX = event.getRawX();
-                        lastPadDragY = event.getRawY();
-                    }
-                    if (!pinchMode) {
-                        if ((dotToDotLength - (float) Math.sqrt(Math.pow(event.getX(0) -
+                        if ((trackPad_Double_Start_PointToPointDistance - (float) Math.sqrt(Math.pow(event.getX(0) -
                                 event.getX(1), 2) + Math.pow(event.getY(0) -
                                 event.getY(1), 2))) > 200 ||
-                                (dotToDotLength - (float) Math.sqrt(Math.pow(event.getX(0) -
+                                (trackPad_Double_Start_PointToPointDistance - (float) Math.sqrt(Math.pow(event.getX(0) -
                                         event.getX(1), 2) + Math.pow(event.getY(0)
                                         - event.getY(1), 2))) < -200) {
-                            pinchMode = true;
-                            scrollMode = false;
+                            trackPad_Double_Mode_0 = 2;
                         }
-                    } else if (pinchMode) {
+                    }
+                    if(trackPad_Double_Mode_0 == 1){
+                        //좌우 스크롤
+                        // 드래그 속도에 따라 좌우스크롤과 앞으로가기 뒤로가기를 구분합니다.
+                        if (((event.getRawY() - trackPad_Single_EndRawY) < 25 && (event.getRawY() - trackPad_Single_EndRawY) > -25)) {
+                            conn.sendKeyboardInput((short) 0xA0, KeyboardPacket.KEY_DOWN, (byte) 0);
+                            conn.sendMouseHighResScroll((short) ((event.getRawY() - PadScrollY) * 5));
+                            PadScrollY = event.getRawY();
+                        } else if (!trackPad_Global_One_Time_Event){
+                            //가장자리
+                            if (event.getRawY() < 150) {
+                                conn.sendMouseButtonDown(MouseButtonPacket.BUTTON_X1);
+                                conn.sendMouseButtonUp(MouseButtonPacket.BUTTON_X1);
+                                trackPad_Global_One_Time_Event = true;
+                            }
+                            if (event.getRawY() > 1450) {
+                                conn.sendMouseButtonDown(MouseButtonPacket.BUTTON_X2);
+                                conn.sendMouseButtonUp(MouseButtonPacket.BUTTON_X2);
+                                trackPad_Global_One_Time_Event = true;
+                            }
+                        }
+                        trackPad_Single_EndRawX = event.getRawX();
+                        trackPad_Single_EndRawY = event.getRawY();
+                    }
+
+                    if(trackPad_Double_Mode_0 == 2){
                         conn.sendKeyboardInput((short) 0xA2, KeyboardPacket.KEY_DOWN, (byte) 0);
                         conn.sendMouseHighResScroll((short) (((float) Math.sqrt(Math.pow(event.getX(0) -
                                 event.getX(1), 2) + Math.pow(event.getY(0) -
@@ -1870,34 +2281,35 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                 }
             }
         }
-        if(event.getPointerCount()==3){
+        if (event.getPointerCount() == 3) {
             //세 손가락 터치 다운
-            if(event.getAction()==517 ){
-                trackPadTouchDownStatus=true;
-                altTabSwitch = true;
-                lastPadTouchDownX=event.getRawX();
-                lastPadTouchDownY=event.getRawY();
+            if (event.getAction() == 517) {
+                trackPad_Triple_StartRawX = event.getRawX();
+                trackPad_Triple_StartRawY = event.getRawY();
             }
             //세 손가락 터치 업
-            if(event.getAction() == 518){
-                trackPadReset(view,event);
+            if (event.getAction() == 518) {
+                trackPad_Global_One_Time_Event = false;
+                trackPadReset(view, event);
             }
             //세 손가락 드래그
-            if(event.getAction() == 2){
-                if(trackPadThreeFinger==0){
+            if (event.getAction() == 2) {
+                if (trackPad_Triple_Mode == 0) {
                     //트랙패드 모드 결정
-                    if(Math.abs(event.getRawX()-lastPadTouchDownX) > 100){
-                        trackPadThreeFinger=1;
+                    if (Math.abs(event.getRawX() - trackPad_Triple_StartRawX) > 100) {
+                        //상하
+                        trackPad_Triple_Mode = 1;
                     }
-                    if(Math.abs(event.getRawY()-lastPadTouchDownY) > 100){
-                        trackPadThreeFinger=2;
+                    if (Math.abs(event.getRawY() - trackPad_Triple_StartRawY) > 100) {
+                        //좌우
+                        trackPad_Triple_Mode = 2;
                     }
                 }
                 //세 손가락 단일 이벤트
-                if(trackPadThreeFinger==1) {
-                    if (trackPadTouchDownStatus) {
+                if (trackPad_Triple_Mode == 1) {
+                    if (!trackPad_Global_One_Time_Event) {
                         //세 손가락 위로 드래그
-                        if (event.getRawX() - lastPadTouchDownX > 100) {
+                        if (event.getRawX() - trackPad_Triple_StartRawX > 100) {
                             conn.sendKeyboardInput(KeyboardTranslator.translate(KeyEvent.KEYCODE_META_LEFT),
                                     KeyboardPacket.KEY_DOWN, (byte) 0x08);
                             conn.sendKeyboardInput(KeyboardTranslator.translate(KeyEvent.KEYCODE_TAB),
@@ -1906,10 +2318,10 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                                     KeyboardPacket.KEY_UP, MODIFIER_WIN);
                             conn.sendKeyboardInput(KeyboardTranslator.translate(KeyEvent.KEYCODE_META_LEFT),
                                     KeyboardPacket.KEY_UP, (byte) 0);
-                            trackPadTouchDownStatus = false;
+                            trackPad_Global_One_Time_Event = true;
                         }
                         //세 손가락 아래로 드래그
-                        if (event.getRawX() - lastPadTouchDownX < -100) {
+                        if (event.getRawX() - trackPad_Triple_StartRawX < -100) {
                             conn.sendKeyboardInput(KeyboardTranslator.translate(KeyEvent.KEYCODE_META_LEFT),
                                     KeyboardPacket.KEY_DOWN, (byte) 0x08);
                             conn.sendKeyboardInput(KeyboardTranslator.translate(KeyEvent.KEYCODE_D),
@@ -1918,79 +2330,76 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                                     KeyboardPacket.KEY_UP, MODIFIER_WIN);
                             conn.sendKeyboardInput(KeyboardTranslator.translate(KeyEvent.KEYCODE_META_LEFT),
                                     KeyboardPacket.KEY_UP, (byte) 0);
-                            trackPadTouchDownStatus = false;
+                            trackPad_Global_One_Time_Event = true;
                         }
                     }
                 }
                 //세 손가락 다중 이벤트
                 //트랙패드 좌우
-                if(trackPadThreeFinger==2) {
-                    if (Math.abs((event.getRawY() - lastPadTouchDownY)) > 100) {
-                        if (altTabSwitch) {
+                if (trackPad_Triple_Mode == 2) {
+                    if (Math.abs((event.getRawY() - trackPad_Triple_StartRawY)) > 200) {
+                        if (!trackPad_Global_One_Time_Event) {
                             conn.sendKeyboardInput(KeyboardTranslator.translate(KeyEvent.KEYCODE_ALT_LEFT),
                                     KeyboardPacket.KEY_DOWN, KeyboardPacket.MODIFIER_ALT);
                             conn.sendKeyboardInput(KeyboardTranslator.translate(KeyEvent.KEYCODE_TAB),
                                     KeyboardPacket.KEY_DOWN, KeyboardPacket.MODIFIER_ALT);
                             conn.sendKeyboardInput(KeyboardTranslator.translate(KeyEvent.KEYCODE_TAB),
                                     KeyboardPacket.KEY_UP, KeyboardPacket.MODIFIER_ALT);
-                            altTabSwitch = false;
+                            trackPad_Triple_StartRawY = event.getRawY();
+                            trackPad_Global_One_Time_Event = true;
                         }
-                        if (event.getRawY() - lastPadTouchDownY < -100) {
+                        if (event.getRawY() - trackPad_Triple_StartRawY < -200) {
                             conn.sendKeyboardInput(KeyboardTranslator.translate(KeyEvent.KEYCODE_DPAD_LEFT),
                                     KeyboardPacket.KEY_DOWN, KeyboardPacket.MODIFIER_ALT);
                             conn.sendKeyboardInput(KeyboardTranslator.translate(KeyEvent.KEYCODE_DPAD_LEFT),
                                     KeyboardPacket.KEY_UP, KeyboardPacket.MODIFIER_ALT);
-                            lastPadTouchDownX = event.getRawX();
-                            lastPadTouchDownY = event.getRawY();
+                            trackPad_Triple_StartRawY = event.getRawY();
                         }
-                        if (event.getRawY() - lastPadTouchDownY > 100) {
+                        if (event.getRawY() - trackPad_Triple_StartRawY > 200) {
                             conn.sendKeyboardInput(KeyboardTranslator.translate(KeyEvent.KEYCODE_DPAD_RIGHT),
                                     KeyboardPacket.KEY_DOWN, KeyboardPacket.MODIFIER_ALT);
                             conn.sendKeyboardInput(KeyboardTranslator.translate(KeyEvent.KEYCODE_DPAD_RIGHT),
                                     KeyboardPacket.KEY_UP, KeyboardPacket.MODIFIER_ALT);
-                            lastPadTouchDownX = event.getRawX();
-                            lastPadTouchDownY = event.getRawY();
+                            trackPad_Triple_StartRawY = event.getRawY();
                         }
                     }
                 }
             }
         }
     }
-
-    public void dragPadPointerCapture(View view , MotionEvent event){
-        if(mouseDownStatus== true && padTimer== true){
-
+    //트랙패드 자동이동 메서드
+    public void dragPadPointerCapture(short autoMoveDirection) {
+        if (trackPad_Single_DownStatus && padTimer) {
             tapDownTimer = new Timer(true);
             tapDownTimer.schedule(new TimerTask() {
                 @Override
                 public void run() {
-                    for (int i=0 ; true ; i++){
-                        try {
-                            Thread.sleep(100);
-                        } catch (InterruptedException e) {
-                            e.printStackTrace(); }
-
-                        padMoveStatus = true;
-
-                        switch (moveDirection){
-                            case 1:
-                                conn.sendMouseMove((short)(1),(short) 0);
-                                break;
-                            case 2:
-                                conn.sendMouseMove((short)(-1),(short) 0);
-                                break;
-                            case 3:
-                                conn.sendMouseMove((short)(0),(short) -1);
-                                break;
-                            case 4:
-                                conn.sendMouseMove((short)(0),(short) 1);
-                                break;
+                    for (int i = 0; true;) {
+                        //마지막으로 실행한 시간과 현재시간의 차가 10ms 일때만 실행합니다.
+                        if(SystemClock.uptimeMillis() - trackPad_Single_autoMoveEventTime > trackPad_autoMoveInterval){
+                            padMoveStatus = true;
+                            switch (autoMoveDirection) {
+                                case 1:
+                                    conn.sendMouseMove((short) (1), (short) 0);
+                                    break;
+                                case 2:
+                                    conn.sendMouseMove((short) (-1), (short) 0);
+                                    break;
+                                case 3:
+                                    conn.sendMouseMove((short) (0), (short) -1);
+                                    break;
+                                case 4:
+                                    conn.sendMouseMove((short) (0), (short) 1);
+                                    break;
+                            }
+                            trackPad_Single_autoMoveEventTime = SystemClock.uptimeMillis();
                         }
-                        if(!mouseDownStatus){
+                        if (!trackPad_Single_DownStatus || stopAutoMove) {
                             if (tapDownTimer != null) {
                                 tapDownTimer.cancel();
                                 tapDownTimer = null;
-                            }break;
+                            }
+                            break;
                         }
                     }
                 }
@@ -1998,33 +2407,236 @@ public class Game extends Activity implements SurfaceHolder.Callback,
         }
     }
 
-    private void trackPadReset(View view, MotionEvent event){
+    //트랙패드 리셋 메서드
+    private void trackPadReset(View view, MotionEvent event) {
         mouseButtonUpSender(MouseButtonPacket.BUTTON_MIDDLE);
         conn.sendKeyboardInput((short) 0xA0, KeyboardPacket.KEY_UP, (byte) 0);
         conn.sendKeyboardInput((short) 0xA2, KeyboardPacket.KEY_UP, (byte) 0);
         conn.sendKeyboardInput(KeyboardTranslator.translate(KeyEvent.KEYCODE_ALT_LEFT), KeyboardPacket.KEY_UP, (byte) 0);
         conn.sendKeyboardInput(KeyboardTranslator.translate(KeyEvent.KEYCODE_TAB), KeyboardPacket.KEY_UP, (byte) 0);
-        lastPadDragX = event.getRawX();
-        lastPadDragY = event.getRawY();
-        lastPadTouchUpY = event.getY();
-        lastPadTouchUpX = event.getX();
-        trackPadTouchDownStatus = altTabSwitch = mouseDownStatus = padMoveStatus = false;
-        trackPadScrollButton = scrollQueue = pinchMode = landMode = false;
-        scrollMode = trackPadMove = true;
-        dotToDotLength = lastPadTouchDownX = lastPadTouchDownY = trackPadThreeFinger = 0;
+        trackPad_Single_EndRawX = event.getRawX();
+        trackPad_Single_EndRawY = event.getRawY();
+        trackPad_Single_DownStatus = padMoveStatus = false;
+        trackPad_Double_Mode = 0;
+        trackPad_Double_Mode_0 = 0;
+        trackPad_Move= true;
+        trackPad_Double_One_Time_Event = false;
+        trackPad_Global_One_Time_Event = false;
+        trackPad_Double_Start_PointToPointDistance = trackPad_Triple_StartRawX = trackPad_Triple_StartRawY = trackPad_Triple_Mode = 0;
+    }
+    //----------------------------------------------------------------------------------------------
+    //에어액션 컨버터
+    public void airActionModeToggle(){
+        switch (airAction_Mode){
+            case 0:
+                airAction_Mode = 1;
+                Toast.makeText(mContext, "에어액션 포인터 모드가 켜졌습니다.", Toast.LENGTH_SHORT).show();
+                spenButtonConnectOn();
+                break;
+            case 1:
+                airAction_Mode = 2;
+                Toast.makeText(mContext, "에어액션 마우스 모드가 켜졌습니다.", Toast.LENGTH_SHORT).show();
+                break;
+            case 4:
+                airAction_Mode = 3;
+                Toast.makeText(mContext, "에어액션 제스쳐 모드가 켜졌습니다.", Toast.LENGTH_SHORT).show();
+                break;
+
+            default:
+                Toast.makeText(mContext, "에어액션이 꺼졌습니다.", Toast.LENGTH_SHORT).show();
+                airActionServiceReset();
+                break;
+        }
     }
 
+    public void airActionConverter(ButtonEvent button) {
+        //------------------------------------------------------------------------------------------
+        // 포인터 모드
+        if(airAction_Mode == 1){
+            if (button.getAction() == ButtonEvent.ACTION_DOWN){
 
+                if (airAction_ButtonUpInputWaitingTime != null) {
+                    airAction_ButtonUpInputWaitingTime.cancel();
+                    airAction_ButtonUpInputWaitingTime = null;
+                }
 
-    //------------------------------------------------------------------
+                if(airAction_ButtonUpInput){
+                    airAction_ButtonUpInput = false;
+                    // 포인터 신호 송신을 허용합니다.
+                    airAction_Move = true;
+                    spenMotionConnectOn();
+                    //타이머 끔
 
-    //레거시 터치 입력 시스템
+                    if (airAction_DisableMotionListening != null) {
+                        airAction_DisableMotionListening.cancel();
+                        airAction_DisableMotionListening = null;
+                    }
+                    //파워포인트 포인터 단축키
+                    keyboardDownSender(KeyEvent.KEYCODE_CTRL_LEFT, KeyboardPacket.MODIFIER_CTRL);
+                    keyboardDownSender(KeyEvent.KEYCODE_L, KeyboardPacket.MODIFIER_CTRL);
+                    keyboardUpSender(KeyEvent.KEYCODE_L, KeyboardPacket.MODIFIER_CTRL);
+                    keyboardUpSender(KeyEvent.KEYCODE_CTRL_LEFT, (byte) 0);
+                    // 마우스 센터 이동
+                    mousePositionSender( (short) (viewWidth/2), (short) (viewHeight/2));
+                }
+            }
+            else {
+                // 에어액션중 버튼이 풀릴경우 바로 작동하지 않게 하여 오작동을 방지합니다.
+                airAction_ButtonUpInputWaitingTime = new Timer(true);
+                airAction_ButtonUpInputWaitingTime.schedule(new TimerTask() {
+                    @Override
+                    public void run() {
+                        airAction_ButtonUpInput = true;
+                        airAction_Move = false;
+                        // 리스너를 켜고 끄는 간격이 빠르면 S펜 연결이 끊어집니다.
+                        // 5초 이후에도 모션 이벤트가 필요없는 경우 리스너를 끊어 S펜 배터리를 절약합니다.
+                        airAction_DisableMotionListening = new Timer(true);
+                        airAction_DisableMotionListening.schedule(new TimerTask() {
+                            @Override
+                            public void run() {
+                                spenMotionConnectOff();
+                            }
+                        }, airAction_DisableMotionListeningWaitTime);
+
+                        mousePositionSender((short) (viewWidth-1), (short) (viewHeight-1));
+
+                        keyboardDownSender(KeyEvent.KEYCODE_CTRL_LEFT, KeyboardPacket.MODIFIER_CTRL);
+                        keyboardDownSender(KeyEvent.KEYCODE_L, KeyboardPacket.MODIFIER_CTRL);
+                        keyboardUpSender(KeyEvent.KEYCODE_L, KeyboardPacket.MODIFIER_CTRL);
+                        keyboardUpSender(KeyEvent.KEYCODE_CTRL_LEFT, (byte) 0);
+                    }
+                }, 150);
+
+            }
+        }
+        //------------------------------------------------------------------------------------------
+        if (airAction_Mode == 2) {
+            if (button.getAction() == ButtonEvent.ACTION_DOWN){
+                //패킷전송 켬
+                airAction_MoveWait = new Timer(true);
+                airAction_MoveWait.schedule(new TimerTask() {
+                    @Override
+                    public void run() {
+                        airAction_Move = true;
+                    }
+                }, 200);
+                //모션 켬
+                spenMotionConnectOn();
+                //타이머 끔
+                if (airAction_DisableMotionListening != null) {
+                    airAction_DisableMotionListening.cancel();
+                    airAction_DisableMotionListening = null;
+                }
+                spenButtonDownTime = SystemClock.uptimeMillis();
+
+                if (trackPad_Single_EventQueue) {
+                    //200ms 초과 : 드래그 후 마우스 떼는것
+                    if ((SystemClock.uptimeMillis() - touchUpTime) > 300) {
+                        conn.sendMouseButtonUp(MouseButtonPacket.BUTTON_LEFT);
+                        trackPad_Single_EventQueue = false;
+                    }
+                    //200ms 미만
+                    if ((SystemClock.uptimeMillis() - touchUpTime) < 300) {
+                        //터치다운 시간 기록
+                        spenButtonDownTime = SystemClock.uptimeMillis();
+
+                        //클릭 타이머 취소
+                        if (trackPad_Single_TapClick != null) {
+                            trackPad_Single_TapClick.cancel();
+                            trackPad_Single_TapClick = null;
+                        }
+                    }
+                }
+                trackPad_Single_DownStatus = true;
+            }
+            else {
+                //패킷전송 끔
+                if (airAction_MoveWait != null) {
+                    airAction_MoveWait.cancel();
+                    airAction_MoveWait = null;
+                }
+                airAction_Move = false;
+                // 리스너를 켜고 끄는 간격이 빠르면 S펜 연결이 끊어집니다.
+                // 5초 이후에도 모션 이벤트가 필요없는 경우 리스너를 끊어 S펜 배터리를 절약합니다.
+                airAction_DisableMotionListening = new Timer(true);
+                airAction_DisableMotionListening.schedule(new TimerTask() {
+                    @Override
+                    public void run() {
+                        spenMotionConnectOff();
+                    }
+                }, airAction_DisableMotionListeningWaitTime);
+                if (!trackPad_Single_EventQueue) {
+                    //터치 다운 후 100미만
+                    if ((SystemClock.uptimeMillis() - spenButtonDownTime) < 200) {
+                        mouseButtonDownSender(MouseButtonPacket.BUTTON_LEFT);
+                        touchUpTime = SystemClock.uptimeMillis();
+                        trackPad_Single_EventQueue = true;
+                    }
+                    //터치 다운 후 100초과
+                    if ((SystemClock.uptimeMillis() - spenButtonDownTime) > 200) {
+                        //드래그 중
+                    }
+                    //터치 다운 후 100미만  200ms 후에도 터치 다운 이벤트 없음
+                    if ((SystemClock.uptimeMillis() - spenButtonDownTime) < 200) {
+                        trackPad_Single_TapClick = new Timer(true);
+                        trackPad_Single_TapClick.schedule(new TimerTask() {
+                            @Override
+                            public void run() {
+                                conn.sendMouseButtonUp(MouseButtonPacket.BUTTON_LEFT);
+                                trackPad_Single_EventQueue = false;
+                            }
+                        }, 200);
+                    }
+                } else {
+                    //200ms 미만 : 클릭
+                    if ((SystemClock.uptimeMillis() - spenButtonDownTime) < 200) {
+                        conn.sendMouseButtonUp(MouseButtonPacket.BUTTON_LEFT);
+                        mouseButtonDownSender(MouseButtonPacket.BUTTON_LEFT);
+                        conn.sendMouseButtonUp(MouseButtonPacket.BUTTON_LEFT);
+                        trackPad_Single_EventQueue = false;
+                    }
+                    //200ms 초과
+                    if ((SystemClock.uptimeMillis() - spenButtonDownTime) > 200) {
+                        conn.sendMouseButtonUp(MouseButtonPacket.BUTTON_LEFT);
+                        trackPad_Single_EventQueue = false;
+                    }
+                }
+                trackPad_Single_DownStatus = false;
+            }
+        }
+        //------------------------------------------------------------------------------------------
+        //제스쳐모드
+        if (airAction_Mode == 3) {
+            if (button.getAction() == ButtonEvent.ACTION_DOWN) {
+                spenMotionConnectOn();
+                airAction_Move = false;
+
+            }else {
+                //제스쳐모드
+                if (airAction_Mode == 3) {
+                    if (airAction_DisableMotionListening != null) {
+                        airAction_DisableMotionListening.cancel();
+                        airAction_DisableMotionListening = null;
+                    }
+                    airAction_DisableMotionListening = new Timer(true);
+                    airAction_DisableMotionListening.schedule(new TimerTask() {
+                        @Override
+                        public void run() {
+                            spenMotionConnectOff();
+                        }
+                    }, airAction_MoveSpeed);
+                }
+            }
+        }
+    }
+
+    //----------------------------------------------------------------------------------------------
+    //레거시 입력 시스템
     private boolean handleMotionEvent(View view, MotionEvent event) {
         //인풋캡쳐 토글
         if (!grabbedInput) {
             return false;
         }
-
         // 컨트롤러 여부 확인
         int eventSource = event.getSource();
         if ((eventSource & InputDevice.SOURCE_CLASS_JOYSTICK) != 0) {
@@ -2035,8 +2647,7 @@ public class Game extends Activity implements SurfaceHolder.Callback,
         //포인터 장치,포지션 장치,마우스 장치 여부
         else if ((eventSource & InputDevice.SOURCE_CLASS_POINTER) != 0 ||
                 (eventSource & InputDevice.SOURCE_CLASS_POSITION) != 0 ||
-                eventSource == InputDevice.SOURCE_MOUSE_RELATIVE)
-        {
+                eventSource == InputDevice.SOURCE_MOUSE_RELATIVE) {
             // 마우스와 비 손가락 터치 장치용
             if (eventSource == InputDevice.SOURCE_MOUSE ||
                     (eventSource & InputDevice.SOURCE_CLASS_POSITION) != 0 || // SOURCE_TOUCHPAD
@@ -2044,26 +2655,14 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                     (event.getPointerCount() >= 1 &&
                             (event.getToolType(0) == MotionEvent.TOOL_TYPE_MOUSE ||
                                     event.getToolType(0) == MotionEvent.TOOL_TYPE_STYLUS ||
-                                    event.getToolType(0) == MotionEvent.TOOL_TYPE_ERASER)))
-            {
+                                    event.getToolType(0) == MotionEvent.TOOL_TYPE_ERASER))) {
                 int changedButtons = event.getButtonState() ^ lastButtonState;
-
-                if(!trackPadScrollButton) {
-                    if ((changedButtons & MotionEvent.BUTTON_PRIMARY) != 0) {
-                        if ((event.getButtonState() & MotionEvent.BUTTON_PRIMARY) != 0) {
-                            mouseButtonDownSender(MouseButtonPacket.BUTTON_LEFT);
-                        } else {
-                            mouseButtonUpSender(MouseButtonPacket.BUTTON_LEFT);
-                        }
-                    }
-                }
 
                 // Mouse secondary or stylus primary is right click (stylus down is left click)
                 if ((changedButtons & (MotionEvent.BUTTON_SECONDARY | MotionEvent.BUTTON_STYLUS_PRIMARY)) != 0) {
                     if ((event.getButtonState() & (MotionEvent.BUTTON_SECONDARY | MotionEvent.BUTTON_STYLUS_PRIMARY)) != 0) {
                         conn.sendMouseButtonDown(MouseButtonPacket.BUTTON_RIGHT);
-                    }
-                    else {
+                    } else {
                         conn.sendMouseButtonUp(MouseButtonPacket.BUTTON_RIGHT);
                     }
                 }
@@ -2075,19 +2674,16 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                             lastAbsTouchDownTime = SystemClock.uptimeMillis();
                             lastAbsTouchDownX = event.getX(0);
                             lastAbsTouchDownY = event.getY(0);
-
                             // Stylus is left click
                             mouseButtonDownSender(MouseButtonPacket.BUTTON_LEFT);
                         } else if (event.getToolType(0) == MotionEvent.TOOL_TYPE_ERASER) {
                             lastAbsTouchDownTime = SystemClock.uptimeMillis();
                             lastAbsTouchDownX = event.getX(0);
                             lastAbsTouchDownY = event.getY(0);
-
                             // Eraser is right click
                             conn.sendMouseButtonDown(MouseButtonPacket.BUTTON_RIGHT);
                         }
-                    }
-                    else if (event.getActionMasked() == MotionEvent.ACTION_UP || event.getActionMasked() == MotionEvent.ACTION_CANCEL) {
+                    } else if (event.getActionMasked() == MotionEvent.ACTION_UP || event.getActionMasked() == MotionEvent.ACTION_CANCEL) {
                         if (event.getToolType(0) == MotionEvent.TOOL_TYPE_STYLUS) {
                             lastAbsTouchUpTime = SystemClock.uptimeMillis();
                             lastAbsTouchUpX = event.getX(0);
@@ -2107,24 +2703,20 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                 lastButtonState = event.getButtonState();
             }
             // This case is for fingers
-            else
-            {
+            else {
                 if (virtualController != null &&
                         (virtualController.getControllerMode() == VirtualController.ControllerMode.MoveButtons ||
                                 virtualController.getControllerMode() == VirtualController.ControllerMode.ResizeButtons)) {
                     // Ignore presses when the virtual controller is being configured
                     return true;
                 }
-
                 if (view == null && !prefConfig.touchscreenTrackpad) {
                     // Absolute touch events should be dropped outside our view.
                     return true;
                 }
-
                 int actionIndex = event.getActionIndex();
-                int eventX = (int)event.getX(actionIndex);
-                int eventY = (int)event.getY(actionIndex);
-
+                int eventX = (int) event.getX(actionIndex);
+                int eventY = (int) event.getY(actionIndex);
                 // Special handling for 3 finger gesture
                 if (event.getActionMasked() == MotionEvent.ACTION_POINTER_DOWN &&
                         event.getPointerCount() == 3) {
@@ -2138,52 +2730,38 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                     }
                     return true;
                 }
-
                 TouchContext context = getTouchContext(actionIndex);
                 if (context == null) {
                     return false;
                 }
-
-                switch (event.getActionMasked())
-                {
+                switch (event.getActionMasked()) {
                     case MotionEvent.ACTION_POINTER_DOWN:
                     case MotionEvent.ACTION_DOWN:
-
-                        movePointer = 0;
                         for (TouchContext touchContext : touchContextMap) {
                             touchContext.setPointerCount(event.getPointerCount());
                         }
                         context.touchDownEvent(eventX, eventY, true);
 
-                        if (event.getButtonState() == 2 ){
+                        if (event.getButtonState() == 2) {
                             conn.sendMouseButtonDown(MouseButtonPacket.BUTTON_RIGHT);
                         }
-
                         break;
                     case MotionEvent.ACTION_POINTER_UP:
                     case MotionEvent.ACTION_UP:
-
                         if (tapDownTimer != null) {
                             tapDownTimer.cancel();
                             tapDownTimer = null;
                         }
-
-                        movePointer = 0;
-
-                        if ( (eventX - lastPadTouchDownX) < -300 && event.getPointerCount() == 2){
+                        if ((eventX - trackPad_Triple_StartRawX) < -300 && event.getPointerCount() == 2) {
                             conn.sendMouseButtonDown(MouseButtonPacket.BUTTON_X1);
                             conn.sendMouseButtonUp(MouseButtonPacket.BUTTON_X1);
-
                         }
-                        if ((eventX - lastPadTouchDownX) > 300 && event.getPointerCount() == 2){
+                        if ((eventX - trackPad_Triple_StartRawX) > 300 && event.getPointerCount() == 2) {
                             conn.sendMouseButtonDown(MouseButtonPacket.BUTTON_X2);
                             conn.sendMouseButtonUp(MouseButtonPacket.BUTTON_X2);
-
                         }
 
-                        lastPadTouchUpY = event.getY();
-                        lastPadTouchUpX = event.getX();
-                        mouseDownStatus = false;
+                        trackPad_Single_DownStatus = false;
                         padMoveStatus = false;
 
                         conn.sendMouseButtonUp(MouseButtonPacket.BUTTON_LEFT);
@@ -2202,7 +2780,7 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                         }
                         if (actionIndex == 0 && event.getPointerCount() > 1 && !context.isCancelled()) {
                             // The original secondary touch now becomes primary
-                            context.touchDownEvent((int)event.getX(1), (int)event.getY(1), false);
+                            context.touchDownEvent((int) event.getX(1), (int) event.getY(1), false);
                         }
                         break;
                     case MotionEvent.ACTION_MOVE:
@@ -2211,21 +2789,19 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                         // First process the historical events
                         for (int i = 0; i < event.getHistorySize(); i++) {
                             for (TouchContext aTouchContextMap : touchContextMap) {
-                                if (aTouchContextMap.getActionIndex() < event.getPointerCount())
-                                {
+                                if (aTouchContextMap.getActionIndex() < event.getPointerCount()) {
                                     aTouchContextMap.touchMoveEvent(
-                                            (int)event.getHistoricalX(aTouchContextMap.getActionIndex(), i),
-                                            (int)event.getHistoricalY(aTouchContextMap.getActionIndex(), i));
+                                            (int) event.getHistoricalX(aTouchContextMap.getActionIndex(), i),
+                                            (int) event.getHistoricalY(aTouchContextMap.getActionIndex(), i));
                                 }
                             }
                         }
                         // Now process the current values
                         for (TouchContext aTouchContextMap : touchContextMap) {
-                            if (aTouchContextMap.getActionIndex() < event.getPointerCount())
-                            {
+                            if (aTouchContextMap.getActionIndex() < event.getPointerCount()) {
                                 aTouchContextMap.touchMoveEvent(
-                                        (int)event.getX(aTouchContextMap.getActionIndex()),
-                                        (int)event.getY(aTouchContextMap.getActionIndex()));
+                                        (int) event.getX(aTouchContextMap.getActionIndex()),
+                                        (int) event.getY(aTouchContextMap.getActionIndex()));
                             }
                         }
                         break;
@@ -2245,7 +2821,6 @@ public class Game extends Activity implements SurfaceHolder.Callback,
         // Unknown class
         return false;
     }
-
     //(레거시) 소프트 키보드 출력 함수
     @Override
     public void showKeyboard() {
@@ -2253,94 +2828,42 @@ public class Game extends Activity implements SurfaceHolder.Callback,
         InputMethodManager inputManager = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
         inputManager.toggleSoftInput(InputMethodManager.SHOW_FORCED, InputMethodManager.HIDE_IMPLICIT_ONLY);
     }
-    //------------------------------------------------------------------
 
-    public void activeManager(){
-        //매 초간 업데이트
+    //터치 관련 함수
+    private TouchContext getTouchContext(int actionIndex) {
+        if (actionIndex < touchContextMap.length) {
+            return touchContextMap[actionIndex];
+        } else {
+            return null;
+        }
+    }
+    //----------------------------------------------------------------------------------------------
+    //----------------------------------------------------------------------------------------------
+    //----------------------------------------------------------------------------------------------
+    // StatusInfo
+
+    public void AutoCallSec() {
         Timer timer = new Timer(true);
         Handler handler = new Handler();
         timer.schedule(new TimerTask() {
             @Override
             public void run() {
-                handler.post(new Runnable(){
-                    public void run(){
-                        autoUpdateSec();
+                handler.post(new Runnable() {
+                    public void run() {
+                        //autoRefreshRate();
+                        getSuggestBitrate();
+                        overlayManager();
+                        networkStatus();
                     }
                 });
             }
         }, 0, 1000);
     }
 
-    //액티브 기술 - 자동 업데이트
-    public void autoUpdateSec()  {
-        autoRefreshRate();
-        getSuggestBitrate();
-        overlayManager();
-        TotalTx = TrafficStats.getTotalTxBytes();
-        TotalRx = TrafficStats.getTotalRxBytes();
-    }
-
-    //액티브 기술 : 가변 주사율
-    public void autoRefreshRate(){
-        if(SurfaceViewState) {
-            if (gRenderedFps < 80) {
-                Settings.Secure.putInt(this.getContentResolver(), refershRateMode, 0);
-            }
-            if(gRenderedFps > 85 ){
-                Settings.Secure.putInt(this.getContentResolver(), refershRateMode, 1);
-            }
-        }
-    }
-
-    // 액티브 기술 : 적절한 비트레이트 값을 구합니다.
-    public void getSuggestBitrate(){
-        if((gPing > 200 || (gRenderedFps > 3 &&gRenderedFps < 50))&&
-                suggestBitrate > ((TrafficStats.getTotalRxBytes()-TotalRx)/125000) ){
-            if(((TrafficStats.getTotalRxBytes()-TotalRx)/125000) != 0){
-                suggestBitrate = (TrafficStats.getTotalRxBytes()-TotalRx)/125000;
-            }
-            else {
-                suggestBitrate = 1;
-            }
-            autoReconnect();
-        }
-        if(gRenderedFps >= 60 && gPing < 300){
-            if(autoReconnectTimer != null) {
-                autoReconnectTimer.cancel();
-                autoReconnectTimer = null;
-            }
-        }
-    }
-
-    @SuppressLint("SetTextI18n")
-    public void overlayManager(){
-        //업데이트 될때마다 위치 변경
-        if(moveTimer == 1){
-            moveTimer = 0;
-            norchLeft.setX(norchLeft.getX() + 1);
-            norchRight.setX(norchRight.getX() + 1);
-        }
-        else {
-            moveTimer = moveTimer+1;
-            norchLeft.setX(norchLeft.getX() - 1);
-            norchRight.setX(norchRight.getX() - 1);
-        }
-        norchLeft.setText(getTimeDate() + " | T : " + gTotalFps + "FPS | N : " +
-                gReceivedFps + "FPS | R : " + gRenderedFps + "FPS | " + getHz() + "Hz | P : " +
-                gPing + "ms | P(V) : " + gVariance + " | L : " + gPacketLossPercentage +
-                "% | set : " + (AppView.setBitrate / 1000) +
-                "Mbps | Suggest : " + (short) suggestBitrate + "Mbps | D : " +
-                (TrafficStats.getTotalRxBytes() - TotalRx) / 125000 + "Mbps | U : " +
-                (TrafficStats.getTotalTxBytes() - TotalTx) / 125 + "Kbps");
-
-        norchRight.setText("D(c) : " + gDecodeTime + "ms | " + gResolutionWidth +
-                " x " + gResolutionHeight + " | " + getBatteryCharge() + " | " + getBatteryPct() + " | " +
-                setBitrate + " Mbps");
-    }
-
-    public boolean getBatteryCharge(){
+    // SystemStatusInfo
+    public boolean getBatteryCharge() {
         IntentFilter ifilter = new IntentFilter(Intent.ACTION_BATTERY_CHANGED);
-        Intent batteryStatus = gameContext.registerReceiver(null, ifilter);
+        Intent batteryStatus = this.registerReceiver(null, ifilter);
 
         // Are we charging / charged?
         int status = batteryStatus.getIntExtra(BatteryManager.EXTRA_STATUS, -1);
@@ -2352,86 +2875,43 @@ public class Game extends Activity implements SurfaceHolder.Callback,
         boolean usbCharge = chargePlug == BatteryManager.BATTERY_PLUGGED_USB;
         boolean acCharge = chargePlug == BatteryManager.BATTERY_PLUGGED_AC;
 
-        return isCharging ;
+        return isCharging;
     }
 
-    public float getBatteryPct (){
+    public float getBatteryPct() {
         IntentFilter ifilter = new IntentFilter(Intent.ACTION_BATTERY_CHANGED);
-        Intent batteryStatus = gameContext.registerReceiver(null, ifilter);
+        Intent batteryStatus = this.registerReceiver(null, ifilter);
 
         int level = batteryStatus.getIntExtra(BatteryManager.EXTRA_LEVEL, -1);
         int scale = batteryStatus.getIntExtra(BatteryManager.EXTRA_SCALE, -1);
 
-        float batteryPct = level * 100 / (float)scale;
+        float batteryPct = level * 100 / (float) scale;
 
-        return  batteryPct ;
+        return batteryPct;
     }
 
-    public String getTimeDate(){
+    public String getTimeDate() {
         SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd hh:mm");
-        return sdf.format(new Date(System.currentTimeMillis())) ;
+        return sdf.format(new Date(System.currentTimeMillis()));
     }
 
-    public short getHz(){
-        int getHz = Settings.Secure.getInt(this.getContentResolver(),refershRateMode,50);
-        short hz ;
-        switch (getHz){
+    public short getHz() {
+        int getHz = Settings.Secure.getInt(this.getContentResolver(), refershRateMode, 50);
+        short hz;
+        switch (getHz) {
             case 0:
-                hz=60;
+                hz = 60;
                 break;
             case 1:
-                hz=120;
+                hz = 120;
                 break;
             default:
-                hz=000 ;
+                hz = 000;
         }
         return hz;
     }
 
-    //노치바 색상 업데이트
-    public void overlayBackground(){
-        Timer timer = new Timer(true);
-        Handler handler = new Handler();
-        timer.schedule(new TimerTask() {
-            @Override
-            public void run() {
-                handler.post(new Runnable(){
-                    public void run(){
-                        if(SurfaceViewState){
-                            if(!pixelCopyState){
-                                pixelCopyState =true;
-                                capturePicture();
-                            }
-                        }
-                    }
-                });
-            }
-        }, 0, 8);
-    }
-    //노치바용 저해상도 화면 캡쳐
-    public void capturePicture() {
-        View surfaceView = streamView;
-        Bitmap bmp = Bitmap.createBitmap(31, surfaceView.getHeight()/8,
-                Bitmap.Config.RGB_565);
-        PixelCopy.request(streamView , bmp, i  -> {
-            int color1 = bmp.getPixel(15, 1);
-
-            if((Color.red(color1) > 125 && Color.green(color1) > 125 )&& Color.blue(color1) > 125) {
-                norchLeft.setTextColor(Color.BLACK);
-                norchRight.setTextColor(Color.BLACK);
-            }
-            else {
-                norchLeft.setTextColor(Color.WHITE);
-                norchRight.setTextColor(Color.WHITE);
-            }
-
-            imagetest.setBackgroundColor(color1);
-            pixelCopyState = false;
-            bmp.recycle();
-        }, new Handler(Looper.getMainLooper()));
-    }
-
-    //연결상태 진단
+    // ConnectionStatusInfo
     @Override
     public void connectionStatusUpdate(final int connectionStatus) {
         runOnUiThread(new Runnable() {
@@ -2444,15 +2924,14 @@ public class Game extends Activity implements SurfaceHolder.Callback,
 
                     if (prefConfig.bitrate > 5000) {
                         notificationOverlayView.setText(getResources().getString(R.string.slow_connection_msg));
-                    }
-                    else {
+                    } else {
                         notificationOverlayView.setText(getResources().getString(R.string.poor_connection_msg));
                     }
                     long currentRx = TrafficStats.getTotalRxBytes();
-                    if( suggestBitrate > ((currentRx-TotalRx)/125000) ){
-                        suggestBitrate = (currentRx-TotalRx)/125000;
+                    if (suggestBitrate > ((currentRx - TotalRx) / 125000)) {
+                        suggestBitrate = (currentRx - TotalRx) / 125000;
                     }
-                    if(autoReconnectPoorTimer!= null){
+                    if (autoReconnectPoorTimer != null) {
                         autoReconnectPoorTimer.cancel();
                         autoReconnectPoorTimer = null;
                     }
@@ -2464,9 +2943,8 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                         }
                     }, 3000);
                     requestedNotificationOverlayVisibility = View.VISIBLE;
-                }
-                else if (connectionStatus == MoonBridge.CONN_STATUS_OKAY) {
-                    if(autoReconnectPoorTimer != null) {
+                } else if (connectionStatus == MoonBridge.CONN_STATUS_OKAY) {
+                    if (autoReconnectPoorTimer != null) {
                         autoReconnectPoorTimer.cancel();
                         autoReconnectPoorTimer = null;
                     }
@@ -2479,117 +2957,16 @@ public class Game extends Activity implements SurfaceHolder.Callback,
         });
     }
 
-    //비트레이트 변경
-    public void autoReconnect(){
-        autoReconnectTimer = new Timer(true);
-        autoReconnectTimer.schedule(new TimerTask() {
-            @Override
-            public void run() {
-                if(suggestBitrate == AppView.setBitrate/1000){
-                    suggestBitrate = setBitrate/2;
-                }
-                Reconnect();
-            }
-        }, 2000);
+    // NetWorkStatusInfo
+    private void networkStatus(){
+        TotalTx = TrafficStats.getTotalTxBytes();
+        TotalRx = TrafficStats.getTotalRxBytes();
     }
 
-    //비트레이트 자동 조정 - 다시 연결하기 위해 현재 화면을 캡쳐합니다.
-    public void Reconnect(){
-        if(SurfaceViewState){
-            captureBitratePicture();
-        }
-    }
-
-    //비트레이트 변경시 고해상도 정지화면 캡쳐
-    public void captureBitratePicture() {
-        View surfaceView = streamView;
-        Bitmap bmpb = Bitmap.createBitmap(surfaceView.getWidth(), surfaceView.getHeight(),
-                Bitmap.Config.ARGB_8888);
-        PixelCopy.request(streamView , bmpb, i  -> {
-            AppView.reBitrate = bmpb;
-            ReconnectOK();
-        }, new Handler(Looper.getMainLooper()));
-    }
-
-    //비트레이트 자동 조정 - 화면 캡쳐가 끝나면 연결을 재시작합니다.
-    public void ReconnectOK(){
-        Activity ac = Game.this;
-        AppView.restertConnection(ac);
-        AppView.setBitrate = (int) (suggestBitrate*1000);
-    }
-
-    public void autoBitrate(){
-        if(AppView.setBitrate == 0){
-            AppView.setBitrate = prefConfig.bitrate;
-        }
-
-        setBitrate = AppView.setBitrate;
-        suggestBitrate = (setBitrate/1000);
-        setBitrate = (int)(setBitrate*1.2) ;
-
-        String host = Game.this.getIntent().getStringExtra(EXTRA_HOST);
-        String appName = Game.this.getIntent().getStringExtra(EXTRA_APP_NAME);
-        int appId = Game.this.getIntent().getIntExtra(EXTRA_APP_ID, StreamConfiguration.INVALID_APP_ID);
-        String uniqueId = Game.this.getIntent().getStringExtra(EXTRA_UNIQUEID);
-        String uuid = Game.this.getIntent().getStringExtra(EXTRA_PC_UUID);
-        String pcName = Game.this.getIntent().getStringExtra(EXTRA_PC_NAME);
-        boolean appSupportsHdr = Game.this.getIntent().getBooleanExtra(EXTRA_APP_HDR, false);
-        byte[] derCertData = Game.this.getIntent().getByteArrayExtra(EXTRA_SERVER_CERT);
-
-        boolean vpnActive = NetHelper.isActiveNetworkVpn(this);
-
-        boolean willStreamHdr = false;
-        int gamepadMask = ControllerHandler.getAttachedControllerMask(this);
-
-        float displayRefreshRate = prepareDisplayForRendering();
-        StreamConfiguration config = new StreamConfiguration.Builder()
-                .setResolution(prefConfig.width, prefConfig.height)
-                .setLaunchRefreshRate(prefConfig.fps)
-                .setRefreshRate(prefConfig.fps)
-                .setApp(new NvApp(appName != null ? appName : "app", appId, appSupportsHdr))
-                .setBitrate(setBitrate)
-                .setEnableSops(prefConfig.enableSops)
-                .enableLocalAudioPlayback(prefConfig.playHostAudio)
-                .setMaxPacketSize(vpnActive ? 1024 : 1392) // Lower MTU on VPN
-                .setRemoteConfiguration(vpnActive ? // Use remote optimizations on VPN
-                        StreamConfiguration.STREAM_CFG_REMOTE :
-                        StreamConfiguration.STREAM_CFG_AUTO)
-                .setHevcBitratePercentageMultiplier(100)
-                .setHevcSupported(decoderRenderer.isHevcSupported())
-                .setEnableHdr(willStreamHdr)
-                .setAttachedGamepadMask(gamepadMask)
-                .setClientRefreshRateX100((int)(displayRefreshRate * 100))
-                .setAudioConfiguration(prefConfig.audioConfiguration)
-                .setAudioEncryption(true)
-                .build();
-
-        conn = new NvConnection(host, uniqueId, config, PlatformBinding.getCryptoProvider(this), setServerCert);
-        controllerHandler = new ControllerHandler(this, conn, this, prefConfig);
-    }
-
-    //액티브 기술
-    public void debugToolOverlay(KeyEvent event) {
-        //fn+f10
-        if(event.getKeyCode()==KeyEvent.KEYCODE_MEDIA_PREVIOUS) {
-            if (MyAccessibilityService.spenDebugTogle) {
-                spenDebug.setVisibility(View.VISIBLE);
-            } else {
-                spenDebug.setVisibility(View.GONE);
-                if(spenDebugUpdateTimer!=null){
-                    spenDebugUpdateTimer.cancel();
-                    spenDebugUpdateTimer=null;
-                }
-            }
-        }
-        //f14
-        if(event.getKeyCode()==120) {
-        }
-    }
-
-    //퍼포먼스 오버레이 관련 함수
+    // DecoderStatusInfo
     @Override
     public void onPerfUpdate(int resolutionWidth, int resolutionHeight, short totalFps,
-                             short receivedFps, short renderedFps, int ping,int variance,
+                             short receivedFps, short renderedFps, int ping, int variance,
                              short decodeTime, float packetLossPercentage) {
         runOnUiThread(new Runnable() {
             @Override
@@ -2604,185 +2981,166 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                 gDecodeTime = decodeTime;
                 gPacketLossPercentage = packetLossPercentage;
 
-                imagetest2.setVisibility(View.GONE);
-                if(AppView.reBitrate !=null){
+                if (AppView.reBitrate != null) {
                     AppView.reBitrate.recycle();
-                    AppView.reBitrate =null;
+                    AppView.reBitrate = null;
                 }
             }
         });
     }
 
-    //------------------------------------------------------------------
 
-    @Override
-    public void stageStarting(final String stage) {
-        runOnUiThread(new Runnable() {
+    //----------------------------------------------------------------------------------------------
+    //----------------------------------------------------------------------------------------------
+    // Active
+
+    // 노치바 색상 업데이트
+    public void overlayBackground() {
+        Timer timer = new Timer(true);
+        Handler handler = new Handler();
+        timer.schedule(new TimerTask() {
             @Override
             public void run() {
-                if (spinner != null) {
-                    spinner.setMessage(getResources().getString(R.string.conn_starting) + " " + stage);
-                }
-            }
-        });
-    }
-
-    @Override
-    public void stageComplete(String stage) {
-    }
-
-    //연결시작시 함수
-    @Override
-    public void connectionStarted() {
-        runOnUiThread(new Runnable() {
-            @Override
-            public void run() {
-                if (spinner != null) {
-                    spinner.dismiss();
-                    spinner = null;
-                }
-
-                setPipAutoEnter(true);
-                connected = true;
-                connecting = false;
-
-                // 잠시 후 마우스 커서를 숨깁니다.
-                // 스피너를 닫히기 전에 이 작업을 수행하면 스피너가 표시될 때 숨기기가 취소된 것 같습니다.
-                // Android Q에서는 스피너에서 캡처하기에는 너무 이릅니다.
-                // 캡처하기 전에 스피너를 닫을 수 있도록 1초 지연됩니다.
-                Handler h = new Handler();
-                h.postDelayed(new Runnable() {
-                    @Override
+                handler.post(new Runnable() {
                     public void run() {
-                        inputCaptureProvider.enableCapture();
+                        if (SurfaceViewState) {
+                            if (!pixelCopyState) {
+                                pixelCopyState = true;
+                                capturePicture();
+                            }
+                        }
                     }
-                }, 1500);
-
-                // 화면 항상 켜기
-                getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-                hideSystemUi(100);
+                });
             }
-        });
+        }, 0, 8);
     }
 
-    //연결 해제 시 연결을 정리하기 위한 함수
-    private void stopConnection() {
-        if (connecting || connected) {
-            setPipAutoEnter(false);
-            connecting = connected = false;
-            controllerHandler.stop();
-            // 연결을 중지할 때 네트워크 I/O를 수행하여 서버에 우리가 가고 정리할 것임을 알리는 데 수백 ms가 걸릴 수 있습니다.
-            // UI를 원활하게 유지하기 위해 별도의 스레드에서 실행하도록 합니다.
-            // moonlight-common 내부에서는 이 스레드를 중지하기 전과 도중에 다른 스레드가 연결을 시작하는 것을 방지합니다.
-            new Thread() {
-                public void run() {
-                    conn.stop();
+    //노치바용 저해상도 화면 캡쳐
+    public void capturePicture() {
+        View surfaceView = streamView;
+        int width = 2960;
+        Bitmap bmp = Bitmap.createBitmap(width+1, surfaceView.getHeight() / 8,
+                Bitmap.Config.RGB_565);
+        PixelCopy.request(streamView, bmp, i -> {
+            int color1 = bmp.getPixel(width/2, 1);
+
+            float norchLeftLine = 0;
+            float norchRightLine = 0;
+
+            for(int b = width/2; b >=0 ; b--){
+                if(bmp.getPixel(b, 1) == -16777216){
+                    norchLeftLine = b;
+                    break;
                 }
-            }.start();
+            }
+
+            for(int c = width/2; c <= width; c++){
+                if(bmp.getPixel(c, 1) == -16777216){
+                   norchRightLine = c;
+                   break;
+                }
+            }
+            if((norchLeftLine!=0 && norchRightLine!=0) &&
+                    (bmp.getPixel(5, 1)== -16777216 && bmp.getPixel((width-5), 1)== -16777216) &&
+                    (((norchLeftLine - (width-norchRightLine))<10)||((norchLeftLine - (width-norchRightLine))>-10))){
+                LinearLayout.LayoutParams param = new LinearLayout.LayoutParams((int) (norchRightLine-norchLeftLine), 28);
+                notchBackground.setLayoutParams(param);
+                notchBackground.setX(3);
+                norchLeft.setVisibility(View.GONE);
+                norchRight.setVisibility(View.GONE);
+            }
+            else {
+                LinearLayout.LayoutParams param = new LinearLayout.LayoutParams(width, 28);
+                notchBackground.setLayoutParams(param);
+                notchBackground.setX(0);
+                norchLeft.setVisibility(View.VISIBLE);
+                norchRight.setVisibility(View.VISIBLE);
+            }
+
+            if ((Color.red(color1) > 125 && Color.green(color1) > 125) && Color.blue(color1) > 125) {
+                norchLeft.setTextColor(Color.BLACK);
+                norchRight.setTextColor(Color.BLACK);
+            } else {
+                norchLeft.setTextColor(Color.WHITE);
+                norchRight.setTextColor(Color.WHITE);
+            }
+            notchBackground.setBackgroundColor(color1);
+            pixelCopyState = false;
+            bmp.recycle();
+        }, new Handler(Looper.getMainLooper()));
+    }
+
+    // 가변 주사율
+    public void autoRefreshRate() {
+        if (SurfaceViewState) {
+            if (gRenderedFps < 80) {
+                Settings.Secure.putInt(this.getContentResolver(), refershRateMode, 0);
+            }
+            if (gRenderedFps > 85) {
+                Settings.Secure.putInt(this.getContentResolver(), refershRateMode, 1);
+            }
         }
     }
 
-    //연결 오류 시 발생하는 함수
-    @Override
-    public void stageFailed(final String stage, final int portFlags, final int errorCode) {
-        // 차단된 포트로 인해 장애가 발생한 경우 연결 테스트를 수행합니다.
-        // 이것은 네트워크 I/O를 수행하므로 메인 스레드에서 수행하지 마십시오.
-        final int portTestResult = MoonBridge.testClientConnectivity(ServerHelper.CONNECTION_TEST_SERVER, 443, portFlags);
-        runOnUiThread(new Runnable() {
+    // 적절한 비트레이트 값을 구합니다.
+    public void getSuggestBitrate() {
+        if ((gPing > 200 || (gRenderedFps > 3 && gRenderedFps < 50)) &&
+                suggestBitrate > ((TrafficStats.getTotalRxBytes() - TotalRx) / 125000)) {
+            if (((TrafficStats.getTotalRxBytes() - TotalRx) / 125000) != 0) {
+                suggestBitrate = (TrafficStats.getTotalRxBytes() - TotalRx) / 125000;
+            } else {
+                suggestBitrate = 1;
+            }
+            if(!releaseVirsion){
+
+                autoReconnect();
+            }
+        }
+        if (gRenderedFps >= 60 && gPing < 300) {
+            if (autoReconnectTimer != null) {
+                autoReconnectTimer.cancel();
+                autoReconnectTimer = null;
+            }
+        }
+    }
+    //비트레이트 변경
+    public void autoReconnect() {
+        autoReconnectTimer = new Timer(true);
+        autoReconnectTimer.schedule(new TimerTask() {
             @Override
             public void run() {
-                if (spinner != null) {
-                    spinner.dismiss();
-                    spinner = null;
+                if (suggestBitrate == AppView.setBitrate / 1000) {
+                    suggestBitrate = setBitrate / 2;
                 }
-                if (!displayedFailureDialog) {
-                    displayedFailureDialog = true;
-                    LimeLog.severe(stage + " failed: " + errorCode);
-                    // 비디오 초기화에 실패하고 표면이 여전히 유효한 경우 사용자에 대한 추가 정보를 표시합니다.
-                    if (stage.contains("video") && streamView.getHolder().getSurface().isValid()) {
-                        Toast.makeText(Game.this, getResources().getText(R.string.video_decoder_init_failed), Toast.LENGTH_LONG).show();
-                    }
-                    String dialogText = getResources().getString(R.string.conn_error_msg) + " " + stage +" (error "+errorCode+")";
-                    if (portFlags != 0) {
-                        dialogText += "\n\n" + getResources().getString(R.string.check_ports_msg) + "\n" +
-                                MoonBridge.stringifyPortFlags(portFlags, "\n");
-                    }
-                    if (portTestResult != MoonBridge.ML_TEST_RESULT_INCONCLUSIVE && portTestResult != 0)  {
-                        dialogText += "\n\n" + getResources().getString(R.string.nettest_text_blocked);
-                    }
-                    Dialog.displayDialog(Game.this, getResources().getString(R.string.conn_error_title), dialogText, true);
-                }
+                Reconnect();
             }
-        });
+        }, 2000);
     }
-
-    //연결 끊김 시 호출되는 함수
-    @Override
-    public void connectionTerminated(final int errorCode) {
-        // 차단된 포트로 인해 장애가 발생한 경우 연결 테스트를 수행합니다.
-        // 이것은 네트워크 I/O를 수행하므로 메인 스레드에서 수행하지 마십시오.
-        final int portFlags = MoonBridge.getPortFlagsFromTerminationErrorCode(errorCode);
-        final int portTestResult = MoonBridge.testClientConnectivity(ServerHelper.CONNECTION_TEST_SERVER,443, portFlags);
-
-        runOnUiThread(new Runnable() {
-            @Override
-            public void run() {
-                // 이제 화면 항상 켜짐 해제
-                getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-                // 커서숨기기 해제
-                inputCaptureProvider.disableCapture();
-
-                if (!displayedFailureDialog) {
-                    displayedFailureDialog = true;
-                    LimeLog.severe("Connection terminated: " + errorCode);
-                    stopConnection();
-
-                    // 예기치 않은 종료인 경우 오류 대화 상자를 표시합니다.
-                    // 그렇지 않으면 즉시 활동을 완료하십시오.
-                    if (errorCode != MoonBridge.ML_ERROR_GRACEFUL_TERMINATION) {
-                        String message;
-
-                        if (portTestResult != MoonBridge.ML_TEST_RESULT_INCONCLUSIVE && portTestResult != 0) {
-                            // If we got a blocked result, that supersedes any other error message
-                            message = getResources().getString(R.string.nettest_text_blocked);
-                        }
-                        else {
-                            switch (errorCode) {
-                                case MoonBridge.ML_ERROR_NO_VIDEO_TRAFFIC:
-                                    message = getResources().getString(R.string.no_video_received_error);
-                                    break;
-
-                                case MoonBridge.ML_ERROR_NO_VIDEO_FRAME:
-                                    message = getResources().getString(R.string.no_frame_received_error);
-                                    break;
-
-                                case MoonBridge.ML_ERROR_UNEXPECTED_EARLY_TERMINATION:
-                                case MoonBridge.ML_ERROR_PROTECTED_CONTENT:
-                                    message = getResources().getString(R.string.early_termination_error);
-                                    break;
-
-                                default:
-                                    message = getResources().getString(R.string.conn_terminated_msg);
-                                    break;
-                            }
-                        }
-
-                        if (portFlags != 0) {
-                            message += "\n\n" + getResources().getString(R.string.check_ports_msg) + "\n" +
-                                    MoonBridge.stringifyPortFlags(portFlags, "\n");
-                        }
-
-                        Dialog.displayDialog(Game.this, getResources().getString(R.string.conn_terminated_title),
-                                message, true);
-                    }
-                    else {
-                        finish();
-                    }
-                }
+    // 비트레이트 자동 조정 - 다시 연결하기 위해 현재 화면을 캡쳐합니다.
+    public void Reconnect() {
+        if(!releaseVirsion){
+            if (SurfaceViewState) {
+                captureBitratePicture();
             }
-        });
+        }
     }
-
+    // 비트레이트 변경시 고해상도 정지화면 캡쳐
+    public void captureBitratePicture() {
+        View surfaceView = streamView;
+        Bitmap bmpb = Bitmap.createBitmap(surfaceView.getWidth(), surfaceView.getHeight(),
+                Bitmap.Config.ARGB_8888);
+        PixelCopy.request(streamView, bmpb, i -> {
+            AppView.reBitrate = bmpb;
+            ReconnectOK();
+        }, new Handler(Looper.getMainLooper()));
+    }
+    // 비트레이트 자동 조정 - 화면 캡쳐가 끝나면 연결을 재시작합니다.
+    public void ReconnectOK() {
+        Activity ac = Game.this;
+        AppView.restertConnection(ac);
+        AppView.setBitrate = (int) (suggestBitrate * 1000);
+    }
+    //----------------------------------------------------------------------------------------------
     //토스트메시지 발생 함수
     @Override
     public void displayMessage(final String message) {
@@ -2807,425 +3165,17 @@ public class Game extends Activity implements SurfaceHolder.Callback,
             });
         }
     }
-
-    //------------------------------------------------------------------
-
-    //서페이스 상태
-    @Override
-    public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
-        SurfaceViewState = true;
-        if (!surfaceCreated) {
-            throw new IllegalStateException("Surface changed before creation!");
-        }
-        if (!attemptedConnection) {
-            attemptedConnection = true;
-
-            decoderRenderer.setRenderTarget(holder);
-            conn.start(PlatformBinding.getAudioRenderer(), decoderRenderer,
-                    Game.this);
-        }
-    }
-
-    @Override
-    public void surfaceCreated(SurfaceHolder holder) {
-        surfaceCreated = true;
-        // Tell the OS about our frame rate to allow it to adapt the display refresh rate appropriately
-        holder.getSurface().setFrameRate(prefConfig.fps,
-                Surface.FRAME_RATE_COMPATIBILITY_FIXED_SOURCE);
-    }
-
-    @Override
-    public void surfaceDestroyed(SurfaceHolder holder) {
-        SurfaceViewState = false;
-        if(autoBackgroundTimer != null){
-            autoBackgroundTimer.cancel();
-            autoBackgroundTimer =null;
-        }
-        if (!surfaceCreated) {
-            throw new IllegalStateException("Surface destroyed before creation!");
-        }
-        if (attemptedConnection) {
-            // Let the decoder know immediately that the surface is gone
-            decoderRenderer.prepareForStop();
-
-            if (connected) {
-                stopConnection();
-            }
-        }
-    }
-
+    //----------------------------------------------------------------------------------------------
+    //Output
     //진동 발생함수
     @Override
     public void rumble(short controllerNumber, short lowFreqMotor, short highFreqMotor) {
-        LimeLog.info(String.format((Locale)null, "Rumble on gamepad %d: %04x %04x",
+        LimeLog.info(String.format((Locale) null, "Rumble on gamepad %d: %04x %04x",
                 controllerNumber, lowFreqMotor, highFreqMotor));
         controllerHandler.handleRumble(controllerNumber, lowFreqMotor, highFreqMotor);
     }
-
-    //안쓰는 코드
-
-    //터치 관련 함수
-    private TouchContext getTouchContext(int actionIndex) {
-        if (actionIndex < touchContextMap.length) {
-            return touchContextMap[actionIndex];
-        }
-        else {
-            return null;
-        }
-    }
-    //모디파이 상태 관련 함수
-    private byte getModifierState() {
-        return (byte) modifierFlags;
-    }
-    // Obtain MotionEvent object
-    public void TouchView(MotionEvent event) {
-    }
-    @Override
-    public boolean handleKeyDown(KeyEvent event) {
-        return true;
-    }
-    @Override
-    public boolean handleKeyUp(KeyEvent event) {
-        return true;
-    }
-    //마우스 움직임 함수
-    @Override
-    public void mouseMove(int deltaX, int deltaY) {
-    }
-    @Override
-    public void mouseButtonEvent(int buttonId, boolean down) {
-    }
-    //마우스 스크롤 함수
-    @Override
-    public void mouseScroll(byte amount) {
-    }
-    @Override
-    public boolean onCreateOptionsMenu(Menu menu) {
-        return false;
-    }
-
-    //키보드 이벤트 관련 함수
-    @Override
-    public void keyboardEvent(boolean buttonDown, short keyCode) {
-        short keyMap = KeyboardTranslator.translate(keyCode);
-        if (keyMap != 0) {
-            if (buttonDown) {
-                conn.sendKeyboardInput(keyMap, KeyboardPacket.KEY_DOWN, getModifierState());
-            }
-            else {
-                conn.sendKeyboardInput(keyMap, KeyboardPacket.KEY_UP, getModifierState());
-            }
-        }
-    }
-
-    //안쓰는 코드 끝
-
-
-
-
-    public static void sendShortcutKey(int keycode, byte keyState, byte modifier ){
-        short translated = KeyboardTranslator.translate(keycode);
-        conn.sendKeyboardInput(translated,
-                keyState, modifier);
-    }
-
-    public static void sendWinTap(){
-        sendShortcutKey(KeyEvent.KEYCODE_META_LEFT , KeyboardPacket.KEY_DOWN,(byte) 0x08);
-        sendShortcutKey(KeyEvent.KEYCODE_TAB , KeyboardPacket.KEY_DOWN,(byte) 0x08);
-        sendShortcutKey(KeyEvent.KEYCODE_TAB , KeyboardPacket.KEY_UP,(byte) 0x0);
-        sendShortcutKey(KeyEvent.KEYCODE_META_LEFT , KeyboardPacket.KEY_UP,(byte) 0x0);
-    }
-
-    public static void sendDesktop(){
-        sendShortcutKey(KeyEvent.KEYCODE_META_LEFT , KeyboardPacket.KEY_DOWN,(byte) 0x08);
-        sendShortcutKey(KeyEvent.KEYCODE_D , KeyboardPacket.KEY_DOWN,(byte) 0x08);
-        sendShortcutKey(KeyEvent.KEYCODE_D , KeyboardPacket.KEY_UP,(byte) 0x0);
-        sendShortcutKey(KeyEvent.KEYCODE_META_LEFT , KeyboardPacket.KEY_UP,(byte) 0x0);
-    }
-
-
-    //시스템 ui모드 관련 함수
-    @Override
-    public void onSystemUiVisibilityChange(int visibility) {
-        // Don't do anything if we're not connected
-        if (!connected) {
-            return;
-        }
-        // This flag is set for all devices
-        if ((visibility & View.SYSTEM_UI_FLAG_FULLSCREEN) == 0) {
-            hideSystemUi(2000);
-        }
-        // This flag is only set on 4.4+
-        else if ((visibility & View.SYSTEM_UI_FLAG_HIDE_NAVIGATION) == 0) {
-            hideSystemUi(2000);
-        }
-    }
-
-    //S펜 에어액션
-    //S펜 Sdk 상태 확인
-    private static void checkSdkInfo() {
-        Log.d(TAG, "VersionCode=" + mSpenRemote.getVersionCode());
-        Log.d(TAG, "versionName=" + mSpenRemote.getVersionName());
-        Log.d(TAG, "Support Button = " + mSpenRemote.isFeatureEnabled(SpenRemote.FEATURE_TYPE_BUTTON));
-        Log.d(TAG, "Support Air motion = " + mSpenRemote.isFeatureEnabled(SpenRemote.FEATURE_TYPE_AIR_MOTION));
-    }
-
-    //S펜 프레임워크 연결
-    private void connectToSpenRemote() {
-        if (mSpenRemote.isConnected()) {
-            return;
-        }
-        mSpenRemote.setConnectionStateChangeListener(new SpenRemote.ConnectionStateChangeListener() {
-            @Override
-            public void onChange(int state) {
-                if (state == SpenRemote.State.DISCONNECTED
-                        || state == SpenRemote.State.DISCONNECTED_BY_UNKNOWN_REASON) {
-                    spenConnectionStatus = false;
-                }
-            }
-        });
-        mSpenRemote.connect(this, mConnectionResultCallback);
-        mIsMotionListening = false;
-    }
-
-    //S펜 프레임워크 연결 해제
-    private  void disconnectSpenRemote() {
-
-        if (mSpenRemote != null) {
-            mSpenRemote.disconnect(Game.this);
-            spenConnectionStatus = false;
-        }
-
-
-    }
-
-    //S펜 연결결과 콜백
-    private static SpenRemote.ConnectionResultCallback mConnectionResultCallback = new SpenRemote.
-            ConnectionResultCallback() {
-        @Override
-        public void onSuccess(SpenUnitManager spenUnitManager) {
-            mSpenUnitManager = spenUnitManager;
-            SpenUnit buttonUnit = mSpenUnitManager.getUnit(SpenUnit.TYPE_BUTTON);
-            mSpenUnitManager.registerSpenEventListener(mButtonEventListener, buttonUnit);
-        }
-        @Override
-        public void onFailure(int i) {
-        }
-    };
-
-    //S펜 모션 켜기
-    public static void spenMotionConnectOn() {
-
-        if (!mSpenRemote.isConnected()) {
-            return;
-        }
-        if (!mIsMotionListening) {
-            SpenUnit airMotionUnit = mSpenUnitManager.getUnit(SpenUnit.TYPE_AIR_MOTION);
-            mSpenUnitManager.registerSpenEventListener(mAirMotionEventListener, airMotionUnit);
-            mIsMotionListening = true;
-        }
-        else {
-
-        }
-    }
-
-    //S펜 모션 끄기
-    public static void spenMotionConnectOff() {
-        if (!mSpenRemote.isConnected()) {
-            return;
-        }
-        if (mIsMotionListening) {
-            SpenUnit airMotionUnit = mSpenUnitManager.getUnit(SpenUnit.TYPE_AIR_MOTION);
-            mSpenUnitManager.unregisterSpenEventListener(airMotionUnit);
-            mIsMotionListening = false;
-        }
-    }
-
-    public static void airActionButtonManagerDead(ButtonEvent button){
-        //버튼다운
-        if (button.getAction() == ButtonEvent.ACTION_DOWN) {
-            spenButtonStatus = true;
-            if(MyAccessibilityService.spenAiractionPointerMode){
-                spenMotionsend = true;
-                conn.sendKeyboardInput(KeyboardTranslator.translate(KeyEvent.KEYCODE_CTRL_LEFT),
-                        KeyboardPacket.KEY_DOWN, (byte) 0x02);
-                conn.sendKeyboardInput(KeyboardTranslator.translate(KeyEvent.KEYCODE_L),
-                        KeyboardPacket.KEY_DOWN, (byte)0x02);
-                conn.sendKeyboardInput(KeyboardTranslator.translate(KeyEvent.KEYCODE_L),
-                        KeyboardPacket.KEY_UP, (byte)0x02);
-                conn.sendKeyboardInput(KeyboardTranslator.translate(KeyEvent.KEYCODE_CTRL_LEFT),
-                        KeyboardPacket.KEY_UP, (byte)0);
-                spenMotionConnectOn();
-                conn.sendMousePosition((short) 1480, (short) 910, (short) 2960, (short) 1820);
-            }
-            //마우스 모드
-            if(MyAccessibilityService.spenMouseMode){
-                //패킷전송 켬
-                if( spenDelay!= null){
-                    spenDelay.cancel();
-                    spenDelay = null;
-                }
-                spenDelay = new Timer(true);
-                spenDelay.schedule(new TimerTask() {
-                    @Override
-                    public void run() {
-                        spenMotionsend = true;
-                    }
-                }, 200);
-
-                //모션 켬
-                spenMotionConnectOn();
-                //타이머 끔
-                if(spenMotionOffTimer!=null){
-                    spenMotionOffTimer.cancel();
-                    spenMotionOffTimer=null;
-                }
-                spenButtonDownTime = SystemClock.uptimeMillis();
-
-                if(touchQueue) {
-                    //200ms 초과 : 드래그 후 마우스 떼는것
-                    if ((SystemClock.uptimeMillis() - touchUpTime) > 300) {
-                        conn.sendMouseButtonUp(MouseButtonPacket.BUTTON_LEFT);
-                        touchQueue=false;
-                    }
-                    //200ms 미만
-                    if ((SystemClock.uptimeMillis() - touchUpTime) < 300) {
-                        //터치다운 시간 기록
-                        spenButtonDownTime = SystemClock.uptimeMillis();
-
-                        //클릭 타이머 취소
-                        if(mouseClick!=null){
-                            mouseClick.cancel();
-                            mouseClick=null;
-                        }
-                    }
-                }
-                mouseDownStatus = true;
-            }
-
-            //제스쳐모드
-            if(MyAccessibilityService.spenGuestureMode){
-                spenMotionConnectOn();
-                spenMotionsend = false;
-            }
-        }
-
-        //버튼 업
-        if (button.getAction() == ButtonEvent.ACTION_UP) {
-            spenButtonStatus = false;
-            if(MyAccessibilityService.spenAiractionPointerMode) {
-                spenMotionsend = false;
-                spenMotionConnectOff();
-                conn.sendMousePosition((short) 2959, (short) 1819, (short) 2960, (short) 1820);
-                conn.sendKeyboardInput(KeyboardTranslator.translate(KeyEvent.KEYCODE_CTRL_LEFT), KeyboardPacket.KEY_DOWN, (byte) 0x02);
-                conn.sendKeyboardInput(KeyboardTranslator.translate(KeyEvent.KEYCODE_L), KeyboardPacket.KEY_DOWN, (byte) 0x02);
-                conn.sendKeyboardInput(KeyboardTranslator.translate(KeyEvent.KEYCODE_L), KeyboardPacket.KEY_UP, (byte) 0x02);
-                conn.sendKeyboardInput(KeyboardTranslator.translate(KeyEvent.KEYCODE_CTRL_LEFT), KeyboardPacket.KEY_UP, (byte) 0);
-            }
-            if(MyAccessibilityService.spenMouseMode){
-                //패킷전송 끔
-
-                if(spenDelay!=null) {
-                    spenDelay.cancel();
-                    spenDelay=null;
-                }
-                spenMotionsend = false;
-
-                if( spenMotionOffTimer!= null){
-                    spenMotionOffTimer.cancel();
-                    spenMotionOffTimer = null;
-                }
-                spenMotionOffTimer = new Timer(true);
-                spenMotionOffTimer.schedule(new TimerTask() {
-                    @Override
-                    public void run() {
-                        spenMotionConnectOff();
-                    }
-                }, 5000);
-
-                if(!touchQueue) {
-                    //터치 다운 후 100미만
-                    if ((SystemClock.uptimeMillis() - spenButtonDownTime) < 200) {
-                        mouseButtonDownSender(MouseButtonPacket.BUTTON_LEFT);
-                        touchUpTime = SystemClock.uptimeMillis();
-                        touchQueue = true;
-                    }
-                    //터치 다운 후 100초과
-                    if ((SystemClock.uptimeMillis() - spenButtonDownTime) > 200) {
-                        //드래그 중
-                    }
-                    //터치 다운 후 100미만  200ms 후에도 터치 다운 이벤트 없음
-                    if((SystemClock.uptimeMillis() - spenButtonDownTime) < 200){
-
-                        if( mouseClick!= null){
-                            mouseClick.cancel();
-                            mouseClick = null;
-                        }
-
-                        mouseClick = new Timer(true);
-                        mouseClick.schedule(new TimerTask() {
-                            @Override
-                            public void run() {
-                                conn.sendMouseButtonUp(MouseButtonPacket.BUTTON_LEFT);
-                                touchQueue = false;
-                            }
-                        }, 200);
-                    }
-                }
-                else {
-                    //200ms 미만 : 클릭
-                    if((SystemClock.uptimeMillis() -spenButtonDownTime)<200){
-                        conn.sendMouseButtonUp(MouseButtonPacket.BUTTON_LEFT);
-                        mouseButtonDownSender(MouseButtonPacket.BUTTON_LEFT);
-                        conn.sendMouseButtonUp(MouseButtonPacket.BUTTON_LEFT);
-                        touchQueue = false;
-                    }
-                    //200ms 초과
-                    if((SystemClock.uptimeMillis() -spenButtonDownTime) >200){
-                        conn.sendMouseButtonUp(MouseButtonPacket.BUTTON_LEFT);
-                        touchQueue = false;
-                    }
-                }
-                mouseDownStatus = false;
-            }
-            //제스쳐모드
-            if(MyAccessibilityService.spenGuestureMode){
-                if( spenMotionOffTimer!= null){
-                    spenMotionOffTimer.cancel();
-                    spenMotionOffTimer = null;
-                }
-                spenMotionOffTimer = new Timer(true);
-                spenMotionOffTimer.schedule(new TimerTask() {
-                    @Override
-                    public void run() {
-                        spenMotionConnectOff();
-                    }
-                }, 5000);
-            }
-            BUTTONSTATEUP = true;
-            BUTTONSTATEDOWN = false;
-            ONEClick = true;
-        }
-    }
-
-    public static void airActionPointerMode(){
-
-    }
-    public static void airActionMouseMode(){
-
-    }
-    public static void airActionGestureMode(){
-
-    }
-
-    public static void motionData() {
-        sendSpenAirMousePacket ();
-    }
-    public static void sendSpenAirMousePacket (){
-        if(spenMotionsend) {
-            conn.sendMouseMove((short) (motionDeltaX * 500), (short) (motionDeltaY * -500));
-        }
-    }
+    //______________________________________________________________________________________________
 }
+
 
 

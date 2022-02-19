@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
     android:description = "@string/conn_error_msg"
+    android:packageNames="com.limelight.root.tab|com.limelightgalaxytab.tab"
     android:accessibilityFlags="flagRequestFilterKeyEvents"
     android:accessibilityFeedbackType="feedbackSpoken"
     android:notificationTimeout="100"
-    android:canRetrieveWindowContent="true"
-    android:settingsActivity="com.example.android.accessibility.ServiceSettingsActivity"
-    android:accessibilityEventTypes="typeViewClicked|typeViewFocused|typeAllMask|typeViewAccessibilityFocusCleared|typeViewHoverEnter|typeViewHoverExit|typeViewLongClicked|typeViewScrolled|typeViewSelected|typeViewTextChanged|typeViewAccessibilityFocused|typeViewTextSelectionChanged|typeViewTextTraversedAtMovementGranularity|typeAnnouncement|typeAssistReadingContext|typeContextClicked|typeGestureDetectionEnd|typeGestureDetectionStart|typeNotificationStateChanged|typeTouchExplorationGestureEnd|typeTouchExplorationGestureStart|typeTouchInteractionEnd|typeTouchInteractionStart|typeWindowContentChanged|typeWindowsChanged|typeWindowStateChanged"
+    android:settingsActivity=""
+    android:accessibilityEventTypes=""
     android:canRequestFilterKeyEvents="true"
     />

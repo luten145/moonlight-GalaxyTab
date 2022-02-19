@@ -2,32 +2,59 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    tools:context=".Game">
+    tools:context=".Game"
+    android:background="#000000">
 
-    <com.limelight.ui.StreamView
-        android:id="@+id/surfaceView"
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:layout_gravity="bottom"
-        android:background="#00ff0000"
-        android:foregroundGravity="bottom" />
+        android:background="#000000"
+        android:foregroundGravity="bottom">
+
+        <com.limelight.ui.StreamView
+            android:id="@+id/surfaceView"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_gravity="bottom"
+            android:background="#00ff0000"
+            android:foregroundGravity="bottom" />
+    </LinearLayout>
+
 
     <ImageView
         android:id="@+id/imim"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom"
-        android:background="#00ff0000"
+        android:background="#000000"
         android:foregroundGravity="bottom"
         android:visibility="gone"/>
 
 
     <RelativeLayout
-        android:background="#00ff0000"
-        android:layout_height="match_parent"
+        android:id="@+id/norch"
+        android:background="#000000"
         android:layout_width="match_parent"
+        android:layout_height="28px"
         android:gravity="top"
-        android:layout_gravity="bottom">
+        android:layout_gravity="top">
+
+        <LinearLayout
+            android:id="@+id/norchBackgroundSize"
+            android:layout_width="wrap_content"
+            android:layout_height="28px"
+            android:background="#000000"
+            android:layout_centerHorizontal="true">
+
+            <ImageView
+                android:id="@+id/norchBackground"
+                android:layout_width="300dp"
+                android:layout_height="28px"
+                android:background="#000000"
+                android:adjustViewBounds="true"/>
+
+        </LinearLayout>
 
         <LinearLayout
             android:layout_width="2960px"
@@ -69,7 +96,6 @@
                     android:layout_height="match_parent"
                     android:background="#00ff0000"
                     android:orientation="horizontal">
-
                     <Button
                         android:id="@+id/action1"
                         android:background="#00ff0000"
@@ -161,9 +187,5 @@
             android:layout_gravity="right"
             android:gravity="right"
             android:visibility="gone"/>
-
-
     </RelativeLayout>
-
-
 </merge>
