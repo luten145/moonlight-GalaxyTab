@@ -297,35 +297,30 @@ public class NvConnection {
             }
         }).start();
     }
-    
     public void sendMouseMove(final short deltaX, final short deltaY)
     {
         if (!isMonkey) {
             MoonBridge.sendMouseMove(deltaX, deltaY);
         }
     }
-
     public void sendMousePosition(short x, short y, short referenceWidth, short referenceHeight)
     {
         if (!isMonkey) {
             MoonBridge.sendMousePosition(x, y, referenceWidth, referenceHeight);
         }
     }
-    
     public void sendMouseButtonDown(final byte mouseButton)
     {
         if (!isMonkey) {
             MoonBridge.sendMouseButton(MouseButtonPacket.PRESS_EVENT, mouseButton);
         }
     }
-    
     public void sendMouseButtonUp(final byte mouseButton)
     {
         if (!isMonkey) {
             MoonBridge.sendMouseButton(MouseButtonPacket.RELEASE_EVENT, mouseButton);
         }
     }
-    
     public void sendControllerInput(final short controllerNumber,
             final short activeGamepadMask, final short buttonFlags,
             final byte leftTrigger, final byte rightTrigger,
@@ -337,7 +332,6 @@ public class NvConnection {
                     leftTrigger, rightTrigger, leftStickX, leftStickY, rightStickX, rightStickY);
         }
     }
-    
     public void sendControllerInput(final short buttonFlags,
             final byte leftTrigger, final byte rightTrigger,
             final short leftStickX, final short leftStickY,

@@ -71,16 +71,15 @@ public class AndroidAudioRenderer implements AudioRenderer {
         switch (audioConfiguration.channelCount)
         {
             case 2:
-                channelConfig = AudioFormat.CHANNEL_OUT_5POINT1;
+                channelConfig = AudioFormat.CHANNEL_OUT_STEREO;
                 break;
             case 4:
-                channelConfig = AudioFormat.CHANNEL_OUT_5POINT1;
+                channelConfig = AudioFormat.CHANNEL_OUT_QUAD;
                 break;
             case 6:
                 channelConfig = AudioFormat.CHANNEL_OUT_5POINT1;
                 break;
             case 8:
-                System.out.println("8채널이니?");
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
                     // AudioFormat.CHANNEL_OUT_7POINT1_SURROUND isn't available until Android 6.0,
                     // yet the CHANNEL_OUT_SIDE_LEFT and CHANNEL_OUT_SIDE_RIGHT constants were added

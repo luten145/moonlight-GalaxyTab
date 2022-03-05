@@ -15,9 +15,14 @@ public class PreferenceConfiguration {
     static final String RESOLUTION_PREF_STRING = "list_resolution";
     static final String FPS_PREF_STRING = "list_fps";
     static final String BITRATE_PREF_STRING = "seekbar_bitrate_kbps";
+    static final String TRACKPAD_SENSE_PREF_STRING = "seekbar_trackpad_trackpad_Sensibility";
+    static final String TRACKPAD_SCROLL_PREF_STRING = "seekbar_trackpad_scroll_Sensibility";
     private static final String BITRATE_PREF_OLD_STRING = "seekbar_bitrate";
+    private static final String TRACKPAD_SENSE_OLD_STRING = "seekbar_trackpad";
+    private static final String TRACKPAD_SCROLL_OLD_STRING = "seekbar_trackpad_scroll";
     private static final String STRETCH_PREF_STRING = "checkbox_stretch_video";
     private static final String SOPS_PREF_STRING = "checkbox_enable_sops";
+    private static final String SMART_NOTCH_FILL_STRING = "checkbox_smart_notch_fill";
     private static final String DISABLE_TOASTS_PREF_STRING = "checkbox_disable_warnings";
     private static final String HOST_AUDIO_PREF_STRING = "checkbox_host_audio";
     private static final String DEADZONE_PREF_STRING = "seekbar_deadzone";
@@ -43,11 +48,13 @@ public class PreferenceConfiguration {
     private static final String FLIP_FACE_BUTTONS_PREF_STRING = "checkbox_flip_face_buttons";
     private static final String TOUCHSCREEN_TRACKPAD_PREF_STRING = "checkbox_touchscreen_trackpad";
     private static final String LATENCY_TOAST_PREF_STRING = "checkbox_enable_post_stream_toast";
+    private static final String LATENCY_TOAST_PREF_STRINGa = "checkbox_enable_post_stream_toasta";
 
     static final String DEFAULT_RESOLUTION = "1280x720";
     static final String DEFAULT_FPS = "60";
     private static final boolean DEFAULT_STRETCH = false;
     private static final boolean DEFAULT_SOPS = true;
+    private static final boolean SMART_NOTCH_FILL_TOASTS = false;
     private static final boolean DEFAULT_DISABLE_TOASTS = false;
     private static final boolean DEFAULT_HOST_AUDIO = false;
     private static final int DEFAULT_DEADZONE = 15;
@@ -72,6 +79,7 @@ public class PreferenceConfiguration {
     private static final boolean DEFAULT_TOUCHSCREEN_TRACKPAD = true;
     private static final String DEFAULT_AUDIO_CONFIG = "2"; // Stereo
     private static final boolean DEFAULT_LATENCY_TOAST = false;
+    private static final boolean DEFAULT_LATENCY_TOASTa = false;
 
     public static final int FORCE_H265_ON = -1;
     public static final int AUTOSELECT_H265 = 0;
@@ -89,8 +97,10 @@ public class PreferenceConfiguration {
     public int bitrate;
     public int videoFormat;
     public int deadzonePercentage;
+    public int trackpadSensibility;
+    public int trackpadScrollSensibility;
     public int oscOpacity;
-    public boolean stretchVideo, enableSops, playHostAudio, disableWarnings;
+    public boolean stretchVideo, enableSops, playHostAudio, disableWarnings , smartNotchFill;
     public String language;
     public boolean smallIconMode, multiController, usbDriver, flipFaceButtons;
     public boolean onscreenController;
@@ -100,6 +110,7 @@ public class PreferenceConfiguration {
     public boolean enablePip;
     public boolean enablePerfOverlay;
     public boolean enableLatencyToast;
+    public boolean enableLatencyToasta;
     public boolean bindAllUsb;
     public boolean mouseEmulation;
     public boolean mouseNavButtons;
@@ -371,6 +382,14 @@ public class PreferenceConfiguration {
         if (config.bitrate == 0) {
             config.bitrate = getDefaultBitrate(context);
         }
+        config.trackpadSensibility = prefs.getInt(TRACKPAD_SENSE_PREF_STRING, prefs.getInt(TRACKPAD_SENSE_OLD_STRING, 0) * 1000);
+        if (config.trackpadSensibility == 0) {
+            config.trackpadSensibility = 1000;
+        }
+        config.trackpadScrollSensibility = prefs.getInt(TRACKPAD_SCROLL_PREF_STRING, prefs.getInt(TRACKPAD_SCROLL_OLD_STRING, 0) * 1000);
+        if (config.trackpadScrollSensibility == 0) {
+            config.trackpadScrollSensibility = 1000;
+        }
 
         String audioConfig = prefs.getString(AUDIO_CONFIG_PREF_STRING, DEFAULT_AUDIO_CONFIG);
         if (audioConfig.equals("71")) {
@@ -392,6 +411,7 @@ public class PreferenceConfiguration {
         config.language = prefs.getString(LANGUAGE_PREF_STRING, DEFAULT_LANGUAGE);
 
         // Checkbox preferences
+        config.smartNotchFill = prefs.getBoolean(SMART_NOTCH_FILL_STRING,SMART_NOTCH_FILL_TOASTS);
         config.disableWarnings = prefs.getBoolean(DISABLE_TOASTS_PREF_STRING, DEFAULT_DISABLE_TOASTS);
         config.enableSops = prefs.getBoolean(SOPS_PREF_STRING, DEFAULT_SOPS);
         config.stretchVideo = prefs.getBoolean(STRETCH_PREF_STRING, DEFAULT_STRETCH);
@@ -414,6 +434,7 @@ public class PreferenceConfiguration {
         config.flipFaceButtons = prefs.getBoolean(FLIP_FACE_BUTTONS_PREF_STRING, DEFAULT_FLIP_FACE_BUTTONS);
         config.touchscreenTrackpad = prefs.getBoolean(TOUCHSCREEN_TRACKPAD_PREF_STRING, DEFAULT_TOUCHSCREEN_TRACKPAD);
         config.enableLatencyToast = prefs.getBoolean(LATENCY_TOAST_PREF_STRING, DEFAULT_LATENCY_TOAST);
+        config.enableLatencyToasta = prefs.getBoolean(LATENCY_TOAST_PREF_STRINGa, DEFAULT_LATENCY_TOASTa);
 
         return config;
     }

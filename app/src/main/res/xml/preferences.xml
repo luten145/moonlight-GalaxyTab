@@ -33,6 +33,10 @@
             android:key="checkbox_stretch_video"
             android:title="@string/title_checkbox_stretch_video"
             android:defaultValue="false" />
+        <CheckBoxPreference
+            android:key="checkbox_smart_notch_fill"
+            android:title="스마트 노치 채우기"
+            android:defaultValue="false"/>
     </PreferenceCategory>
     <PreferenceCategory android:title="@string/category_audio_settings">
         <ListPreference
@@ -51,6 +55,30 @@
             android:max="50"
             android:text="@string/suffix_seekbar_deadzone"
             android:title="@string/title_seekbar_deadzone"/-->
+        <com.limelight.preferences.SeekBarPreference
+            android:key="seekbar_trackpad_trackpad_Sensibility"
+            android:dialogMessage="트랙패드 감도"
+            seekbar:min="500"
+            android:max="10000"
+            seekbar:step="1000"
+            seekbar:keyStep="1000"
+            seekbar:divisor="1000"
+            android:summary="트랙패드 감도를 설정합니다."
+            android:text=""
+            android:title="트랙패드 감도" />
+
+        <com.limelight.preferences.SeekBarPreference
+            android:key="seekbar_trackpad_scroll_Sensibility"
+            android:dialogMessage="트랙패드 스크롤 감도"
+            seekbar:min="500"
+            android:max="10000"
+            seekbar:step="1000"
+            seekbar:keyStep="1000"
+            seekbar:divisor="1000"
+            android:summary="트랙패드 스크롤 감도를 설정합니다."
+            android:text=""
+            android:title="트랙패드 스크롤 감도" />
+
         <CheckBoxPreference
             android:key="checkbox_touchscreen_trackpad"
             android:title="@string/title_checkbox_touchscreen_trackpad"

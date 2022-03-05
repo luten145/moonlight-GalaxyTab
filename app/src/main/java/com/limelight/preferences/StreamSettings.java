@@ -42,9 +42,7 @@ public class StreamSettings extends Activity {
     static DisplayCutout displayCutoutP;
 
     void reloadSettings() {
-        getFragmentManager().beginTransaction().replace(
-                R.id.stream_settings, new SettingsFragment()
-        ).commitAllowingStateLoss();
+        getFragmentManager().beginTransaction().replace(R.id.stream_settings, new SettingsFragment()).commitAllowingStateLoss();
     }
 
     @Override
@@ -522,11 +520,9 @@ public class StreamSettings extends Activity {
                         }
                     }
                 }
-
                 if (!foundHdr10) {
                     LimeLog.info("Excluding HDR toggle based on display capabilities");
-                    PreferenceCategory category =
-                            (PreferenceCategory) findPreference("category_advanced_settings");
+                    PreferenceCategory category = (PreferenceCategory) findPreference("category_advanced_settings");
                     category.removePreference(findPreference("checkbox_enable_hdr"));
                 }
             }

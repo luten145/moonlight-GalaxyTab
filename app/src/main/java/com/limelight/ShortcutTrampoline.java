@@ -153,7 +153,6 @@ public class ShortcutTrampoline extends Activity {
                                                     intentStack.add(ServerHelper.createStartIntent(ShortcutTrampoline.this,
                                                             new NvApp(null, details.runningGameId, false), details, managerBinder));
                                                 }
-
                                                 // Now start the activities
                                                 startActivities(intentStack.toArray(new Intent[]{}));
                                             }

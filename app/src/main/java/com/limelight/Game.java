@@ -1,6 +1,5 @@
 package com.limelight;
 
-//1.임포트
 import static android.content.ContentValues.TAG;
 import static com.limelight.nvstream.input.KeyboardPacket.MODIFIER_WIN;
 
@@ -50,8 +49,10 @@ import android.content.pm.PackageManager;
 import android.content.res.Configuration;
 import android.graphics.Bitmap;
 import android.graphics.Color;
+import android.graphics.Point;
 import android.graphics.Rect;
 import android.hardware.input.InputManager;
+import android.icu.text.Transliterator;
 import android.media.AudioManager;
 import android.net.ConnectivityManager;
 import android.net.TrafficStats;
@@ -105,23 +106,33 @@ import com.samsung.android.sdk.penremote.SpenUnit;
 import com.samsung.android.sdk.penremote.SpenUnitManager;
 
 
-//2.클래스 시작
 public class Game extends Activity implements SurfaceHolder.Callback,
         OnGenericMotionListener, OnTouchListener, NvConnectionListener,
         OnSystemUiVisibilityChangeListener, GameGestures, StreamView.InputCallbacks,
         PerfOverlayListener {
-
     //______________________________________________________________________________________________
 
+    // Model Profile
+
+    // Tab S8 Ultra
+
+
+    // Swtich
+
+    //----------------------------------------------------------------------------------------------
+    //----------------------------------------------------------------------------------------------
+
     // System Settings
+    // Reference
     private static final String refershRateMode = "refresh_rate_mode";
     private WifiManager.WifiLock highPerfWifiLock;
     private WifiManager.WifiLock lowLatencyWifiLock;
     //----------------------------------------------------------------------------------------------
     //----------------------------------------------------------------------------------------------
     // Moonlight Settings
-    private PreferenceConfiguration prefConfig;
-    private SharedPreferences tombstonePrefs;
+    // Reference
+    private static PreferenceConfiguration prefConfig;
+    private static SharedPreferences tombstonePrefs;
     //----------------------------------------------------------------------------------------------
     //----------------------------------------------------------------------------------------------
     // Connection
@@ -148,15 +159,16 @@ public class Game extends Activity implements SurfaceHolder.Callback,
     public static int viewHeight;
     public static int viewWidth;
     public float moveTimer = 0;
-    public static Context mContext;
     // Reference
+    public static Context mContext;
+    public static Activity mActivity;
     private SpinnerDialog spinner;
     private StreamView streamView;
     private ImageView reconnectionWaitingImage;
     private ImageView notchBackground;
     private TextView notificationOverlayView;
-    private TextView norchRight;
-    private TextView norchLeft;
+    private TextView notchRight;
+    private TextView notchLeft;
     // Switch
     private boolean surfaceCreated = false;
     private boolean isHidingOverlays;
@@ -185,8 +197,21 @@ public class Game extends Activity implements SurfaceHolder.Callback,
     //----------------------------------------------------------------------------------------------
     // KeyBoard
     public static int KeyCombination = 0;
+    //----------------------------------------------------------------------------------------------
     // Mouse
     public int lastButtonDown;
+
+    // 0 : Move Mode
+    // 1 : PositionMode
+    private static short mouseSendMode = 0;
+
+    private short mousePositionX = 0;
+    private short mousePositionY = 0;
+
+    private ImageView pointer;
+
+    private boolean hidePointer;
+    private Timer hidePointerTimer;
     //----------------------------------------------------------------------------------------------
     // AirAction
     // Settings
@@ -210,9 +235,11 @@ public class Game extends Activity implements SurfaceHolder.Callback,
     //----------------------------------------------------------------------------------------------
     // TrackPad
     // Settings
-    private static short trackPad_autoMoveInterval = 20;
+    private static short trackPad_autoMoveInterval = 10;
     private static short trackPad_TapEventThreshold = 200;
     // Data
+    private static int trackPad_SENSE;
+    private static int trackPad_SCROLL;
     private float trackPad_Single_StartRawX;
     private float trackPad_Single_StartRawY;
     private float trackPad_Single_EndRawX;
@@ -258,9 +285,7 @@ public class Game extends Activity implements SurfaceHolder.Callback,
     private static final int REFERENCE_HORIZ_RES = 1280;
     private static final int REFERENCE_VERT_RES = 720;
     private final TouchContext[] touchContextMap = new TouchContext[2];
-    // 3 터치 후 키보드
     private static final int THREE_FINGER_TAP_THRESHOLD = 300;
-    // 3핑거 터치 다운타임
     private long threeFingerDownTime = 0;
 
     //----------------------------------------------------------------------------------------------
@@ -291,7 +316,8 @@ public class Game extends Activity implements SurfaceHolder.Callback,
 
     public static int swi = 0;
     public static final boolean releaseVirsion = true ;
-    public View norch;
+    public View notch;
+    private int modifierFlags = 0;
 
     //3.서비스
     private ServiceConnection usbDriverServiceConnection = new ServiceConnection() {
@@ -341,7 +367,7 @@ public class Game extends Activity implements SurfaceHolder.Callback,
 
         // 성능
         // 일관성을 보장하기 위해 지속 성능 모드를 사용합니다. (클럭 낮춘상태에서 안정적 실행 가능)
-        getWindow().setSustainedPerformanceMode(true);
+        //getWindow().setSustainedPerformanceMode(true);
         // Listen for UI visibility events
         getWindow().getDecorView().setOnSystemUiVisibilityChangeListener(this);
 
@@ -366,6 +392,9 @@ public class Game extends Activity implements SurfaceHolder.Callback,
         UiHelper.setLocale(this);
         // Moonlight Settings
         prefConfig = PreferenceConfiguration.readPreferences(this);
+        System.out.println(prefConfig.trackpadSensibility);
+        trackPad_SENSE = prefConfig.trackpadSensibility;
+        trackPad_SCROLL = prefConfig.trackpadScrollSensibility;
         tombstonePrefs = Game.this.getSharedPreferences("DecoderTombstone", 0);
         //------------------------------------------------------------------------------------------
         //------------------------------------------------------------------------------------------
@@ -459,18 +488,17 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                     Toast.LENGTH_LONG).show();
         }
         notificationOverlayView = findViewById(R.id.notificationOverlay);
-        norchRight = findViewById(R.id.norchRight);
-        norchLeft = findViewById(R.id.norchLeft);
+        notchRight = findViewById(R.id.notchRight);
+        notchLeft = findViewById(R.id.notchLeft);
         streamView = findViewById(R.id.surfaceView);
-        notchBackground = findViewById(R.id.norchBackground);
+        notchBackground = findViewById(R.id.notchBackground);
+        notch = findViewById(R.id.notch);
 
-        norch = findViewById(R.id.norch);
-        norch.setVisibility(View.GONE);
-        if(Build.MODEL.equals("SM-X906N")||Build.MODEL.equals("SM-X900")){
-            if(prefConfig.height == 1820){
-                norch.setVisibility(View.VISIBLE);
-            }
+
+        if(prefConfig.smartNotchFill){
+
         }
+
         if (prefConfig.stretchVideo || shouldIgnoreInsetsForResolution(prefConfig.width,
                 prefConfig.height)) {
             // Allow the activity to layout under notches if the fill-screen option
@@ -478,7 +506,6 @@ public class Game extends Activity implements SurfaceHolder.Callback,
             getWindow().getAttributes().layoutInDisplayCutoutMode =
                     WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS;
         }
-
         //------------------------------------------------------------------------------------------
         //------------------------------------------------------------------------------------------
         // Decode
@@ -511,7 +538,7 @@ public class Game extends Activity implements SurfaceHolder.Callback,
             Toast.makeText(this, "No HEVC decoder found.\nFalling back to H.264.",
                     Toast.LENGTH_LONG).show();
         }
-        //기타
+        // 기타
         if (!decoderRenderer.isAvcSupported()) {
             if (spinner != null) {
                 spinner.dismiss();
@@ -607,12 +634,12 @@ public class Game extends Activity implements SurfaceHolder.Callback,
             public void onClick(View v) {
                 if (!overlaySwitch) {
                     overlaySwitch = true;
-                    norchLeft.setVisibility(View.GONE);
-                    norchRight.setVisibility(View.GONE);
+                    notchLeft.setVisibility(View.GONE);
+                    notchRight.setVisibility(View.GONE);
                 } else {
                     overlaySwitch = false;
-                    norchLeft.setVisibility(View.VISIBLE);
-                    norchRight.setVisibility(View.VISIBLE);
+                    notchLeft.setVisibility(View.VISIBLE);
+                    notchRight.setVisibility(View.VISIBLE);
                 }
             }
         });
@@ -624,6 +651,9 @@ public class Game extends Activity implements SurfaceHolder.Callback,
         streamView.requestPointerCapture();
         pointerCaptureOn();
         streamView.setOnGenericMotionListener(this);
+
+        pointer = findViewById(R.id.pointer);
+
         //------------------------------------------------------------------------------------------
         // AirAction
         checkSdkInfo();
@@ -670,7 +700,13 @@ public class Game extends Activity implements SurfaceHolder.Callback,
         //------------------------------------------------------------------------------------------
         // Active
         // 노치 배경 업데이트 시작
-        overlayBackground();
+
+        if(prefConfig.smartNotchFill){
+            if(Build.MODEL.equals("SM-X906N")||Build.MODEL.equals("SM-X900")){
+                notchBackground();
+            }
+        }
+
         //__________________________________________________________________________________________
         // Environment Setup Complete
         // Connection Start!
@@ -686,12 +722,12 @@ public class Game extends Activity implements SurfaceHolder.Callback,
     protected void onResume() {
         super.onResume();
         mContext = this;
+        mActivity = this;
         System.out.println("onResume");
         accessibilityKeyOn();
-        connectToSpenRemote();
+        connectAirActionFrameWork();
 
         if(!releaseVirsion){
-
             if(swi==2){
                 ServerHelper.restart = false;
             }
@@ -857,14 +893,16 @@ public class Game extends Activity implements SurfaceHolder.Callback,
     }
 
     public void GlobalExit(){
-        airActionServiceReset();
+        resetAirActionService();
         pointerCaptureOff();
-        disconnectToSpenRemote();
+        disconnectAirActionFrameWork();
 
         if(!releaseVirsion){
             Settings.Secure.putInt(this.getContentResolver(), refershRateMode, 1);
         }
         mContext = null;
+        mActivity = null;
+        pointer =null;
     }
 
     //______________________________________________________________________________________________
@@ -1226,28 +1264,31 @@ public class Game extends Activity implements SurfaceHolder.Callback,
     @SuppressLint("SetTextI18n")
     public void overlayManager() {
         //업데이트 될때마다 위치 변경
-        if (moveTimer == 1) {
+        if (moveTimer == 100) {
+            notchLeft.setX(notchLeft.getX() + 1);
+            notchRight.setX(notchRight.getX() + 1);
+            moveTimer += 1;
+        } else if (moveTimer == 200){
+            notchLeft.setX(notchLeft.getX() - 1);
+            notchRight.setX(notchRight.getX() - 1);
             moveTimer = 0;
-            norchLeft.setX(norchLeft.getX() + 1);
-            norchRight.setX(norchRight.getX() + 1);
-        } else {
-            moveTimer = moveTimer + 1;
-            norchLeft.setX(norchLeft.getX() - 1);
-            norchRight.setX(norchRight.getX() - 1);
         }
-        if(!releaseVirsion){
-            norchLeft.setText(getTimeDate() + " | T : " + gTotalFps + "FPS | N : " +
-                    gReceivedFps + "FPS | R : " + gRenderedFps + "FPS | " + getHz() + "Hz | P : " +
+        else {
+            moveTimer += 1;
+        }
+        if(releaseVirsion&& prefConfig.enablePerfOverlay){
+            notchLeft.setText(getTimeDate() + " | T : " + gTotalFps + "FPS | N : " +
+                    gReceivedFps + "FPS | R : " + gRenderedFps + "FPS | P : " +
                     gPing + "ms | P(V) : " + gVariance + " | L : " + gPacketLossPercentage +
                     "% | set : " + (AppView.setBitrate / 1000) +
                     "Mbps | Suggest : " + (short) suggestBitrate + "Mbps | D : " +
                     (TrafficStats.getTotalRxBytes() - TotalRx) / 125000 + "Mbps | U : " +
                     (TrafficStats.getTotalTxBytes() - TotalTx) / 125 + "Kbps");
 
-            norchRight.setText("AirAction FrameWork : "+ mSpenRemote.isConnected() + " | Button Service : " + airAction_IsButtonListening +
+            notchRight.setText("AirAction Framework : "+ mSpenRemote.isConnected() + " | Button Service : " + airAction_IsButtonListening +
                     " | Motion Service : " + airAction_IsMotionListening +" | D(c) : " + gDecodeTime + "ms | " +
                     gResolutionWidth + " x " + gResolutionHeight + " | " + getBatteryCharge() + " | " +
-                    getBatteryPct() + " | " + setBitrate + " Mbps");
+                    getBatteryPct() + " | Real Set : " + setBitrate + " Kbps");
 
         }
     }
@@ -1434,15 +1475,13 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                 Math.round(refreshRate) % prefConfig.fps <= 3;
     }
 
-    //----------------------------------------------------------------------------------------------
-    //----------------------------------------------------------------------------------------------
-    //----------------------------------------------------------------------------------------------
+    //______________________________________________________________________________________________
     // Input Integrated Management System
-
+    //----------------------------------------------------------------------------------------------
     // Input Service pool
-
-    //S펜 에어액션
-    //S펜 Sdk 상태 확인
+    //----------------------------------------------------------------------------------------------
+    // AirAction
+    // Data
     private void checkSdkInfo() {
         Log.d(TAG, "VersionCode=" + mSpenRemote.getVersionCode());
         Log.d(TAG, "versionName=" + mSpenRemote.getVersionName());
@@ -1451,51 +1490,44 @@ public class Game extends Activity implements SurfaceHolder.Callback,
         Log.d(TAG, "Support Air motion = " + mSpenRemote
                 .isFeatureEnabled(SpenRemote.FEATURE_TYPE_AIR_MOTION));
     }
-    //S펜 프레임워크 연결
-    private void connectToSpenRemote() {
-        //이미 연결되어있는지 반드시 확인해야 함
-        //확인하지 않으면 메서드가 응답하지 않음 (크래시 발생)
+    // Swtich
+    private void connectAirActionFrameWork() {
         if (mSpenRemote.isConnected()) {
             return;
         }
-        //에어액션 상태 상태 리스너 등록
         mSpenRemote.setConnectionStateChangeListener(new SpenRemote.ConnectionStateChangeListener() {
             @Override
             public void onChange(int state) {
-                // state
-                // SpenRemote.State.CONNECTED
-                // SpenRemote.State.DISCONNECTED  정상적인 disconnect 호출을 통한 연결해제
-                // SpenRemote.State.DISCONNECTED_BY_UNKNOWN_REASON
-            }
+                }
         });
-        //S펜 연결 메서드
         mSpenRemote.connect(this, mConnectionResultCallback);
-        //연결을 하지 않았으니 false임
         airAction_IsButtonListening = false;
         airAction_IsMotionListening = false;
     }
-    //S펜 연결결과 콜백
     private SpenRemote.ConnectionResultCallback mConnectionResultCallback = new SpenRemote.
             ConnectionResultCallback() {
         @Override
         public void onSuccess(SpenUnitManager spenUnitManager) {
             mSpenUnitManager = spenUnitManager;
+            Log.d(TAG, "AirAction Connect Result : Connected");
         }
         @Override
         public void onFailure(int i){
+            Log.d(TAG, "AirAction Connect Result : Fail" + i);
             // i
             // SpenRemote.Error.CONNECTION_FAILED S펜 프레임워크가 연결 거부신호를 보냄
             // SpenRemote.Error.UNKNOWN
             // SpenRemote.Error.UNSUPPORTED_DEVICE
         }
     };
-    //S펜 버튼 리스너 켜기
-    public void spenButtonConnectOn() {
+    private void disconnectAirActionFrameWork() {
+        mSpenRemote.disconnect(mContext);
+    }
+    public void AirActionButtonServiceOn() {
         if (!mSpenRemote.isConnected()) {
             Log.d(TAG, "Spen FrameWork Not Connected");
             return;
         }
-
         if (!airAction_IsButtonListening) {
             Log.d(TAG, "register Button Listening");
             SpenUnit buttonUnit = mSpenUnitManager.getUnit(SpenUnit.TYPE_BUTTON);
@@ -1506,8 +1538,7 @@ public class Game extends Activity implements SurfaceHolder.Callback,
             Log.d(TAG, "Already Button Listening");
         }
     }
-    //S펜 버튼 리스너 끄기
-    public void spenButtonConnectOff() {
+    public void AirActionButtonServiceOff() {
         if (!mSpenRemote.isConnected()) {
             return;
         }
@@ -1517,20 +1548,17 @@ public class Game extends Activity implements SurfaceHolder.Callback,
             airAction_IsButtonListening = false;
         }
     }
-    //S펜 모션 켜기
-    public void spenMotionConnectOn() {
+    public void AirActionMotionServiceOn() {
         if (!mSpenRemote.isConnected()) {
             return;
         }
         if (!airAction_IsMotionListening) {
             SpenUnit airMotionUnit = mSpenUnitManager.getUnit(SpenUnit.TYPE_AIR_MOTION);
-            //바로 리스너 등록후 매니저 섹션으로 이동함
             mSpenUnitManager.registerSpenEventListener(mAirMotionEventListener, airMotionUnit);
             airAction_IsMotionListening = true;
         }
     }
-    //S펜 모션 끄기
-    public void spenMotionConnectOff() {
+    public void AirActionMotionServiceOff() {
         if (!mSpenRemote.isConnected()) {
             return;
         }
@@ -1540,22 +1568,16 @@ public class Game extends Activity implements SurfaceHolder.Callback,
             airAction_IsMotionListening = false;
         }
     }
-    //S펜 프레임워크 연결 해제
-    private void disconnectToSpenRemote() {
-        mSpenRemote.disconnect(mContext);
-    }
-
-    private void airActionServiceReset(){
+    private void resetAirActionService(){
         airAction_Mode = 0;
-        spenButtonConnectOff();
-        spenMotionConnectOff();
+        AirActionButtonServiceOff();
+        AirActionMotionServiceOff();
     }
-
     //----------------------------------------------------------------------------------------------
-    //포인터 캡쳐
-    //포인터 캡쳐 켜기
+    // PointerCapture
+    // Switch
     public void pointerCaptureOn(){
-        //streamView.requestPointerCapture();
+        streamView.requestPointerCapture();
         streamView.setOnCapturedPointerListener(new View.OnCapturedPointerListener() {
             @Override
             public boolean onCapturedPointer(View view, MotionEvent motionEvent) {
@@ -1563,29 +1585,24 @@ public class Game extends Activity implements SurfaceHolder.Callback,
             }
         });
     }
-    //포인터 캡쳐 끄기
     public void pointerCaptureOff(){
         streamView.releasePointerCapture();
     }
     //----------------------------------------------------------------------------------------------
-    //접근성 키 이벤트
-    //접근성 키 켜기
+    // Accessibility Key
+    // Switch
     public void accessibilityKeyOn(){
         Log.d("KeyBoard","KeyBoardOn");
         MyAccessibilityService.accessibilityKeyListening = true;
     }
-    //접근성 키 끄기
     public void accessibilityKeyOff(){
         Log.d("KeyBoard","KeyBoardOff");
         MyAccessibilityService.accessibilityKeyListening = false;
     }
     //----------------------------------------------------------------------------------------------
     //----------------------------------------------------------------------------------------------
-    //Input Signal Manager pool
-    //키 입력 (접근성 버튼 -> OnKeyDown/Up 으로 전송됨)
-    //접근성 버튼 이벤트 수신기
+    // Input Signal Manager pool
     public boolean accessibilityKeyManager(KeyEvent event) {
-        //화이트 리스트에 포함되어 있는지 확인합니다.
         if (keyEventWhitelist(event)){
             return false;
         }
@@ -1593,7 +1610,6 @@ public class Game extends Activity implements SurfaceHolder.Callback,
             return keyboardHandler(event);
         }
     }
-    //버튼 다운 입력
     @Override
     public boolean onKeyDown(int keyCode, KeyEvent event) {
         super.onKeyDown(keyCode, event);
@@ -1601,50 +1617,36 @@ public class Game extends Activity implements SurfaceHolder.Callback,
             return false;
         }
         else {
-            return true;
+            return handleKeyDown(event) || super.onKeyDown(keyCode, event);
         }
     }
-    //버튼 업 입력
     @Override
     public boolean onKeyUp(int keyCode, KeyEvent event) {
-        super.onKeyUp(keyCode, event);
         if (keyEventWhitelist(event)){
             return false;
         }
         else {
-            return true;
+            return handleKeyUp(event) || super.onKeyUp(keyCode, event);
         }
     }
-    // 키 이벤트 통합 화이트 리스트
     public static boolean keyEventWhitelist(KeyEvent event){
         switch (event.getKeyCode()){
-            case KeyEvent.KEYCODE_BRIGHTNESS_UP:
-            case KeyEvent.KEYCODE_BRIGHTNESS_DOWN:
-            case KeyEvent.KEYCODE_VOLUME_MUTE:
-            case KeyEvent.KEYCODE_VOLUME_DOWN:
+            case KeyEvent.KEYCODE_BRIGHTNESS_UP: case KeyEvent.KEYCODE_BRIGHTNESS_DOWN:
+            case KeyEvent.KEYCODE_VOLUME_MUTE: case KeyEvent.KEYCODE_VOLUME_DOWN:
             case KeyEvent.KEYCODE_VOLUME_UP:
-                return true;
+                //컨트롤러 전용
+            case 102: case 103: case 110: case 106: case 109: case 108: case 107: case 96: case 97:
+                case 99: case 100:
+               return true;
             default:
                 return false;
         }
     }
-
-    // 터치 키보드 인풋
-    @Override
-    public boolean handleKeyDown(KeyEvent event) {
-        return true;
-    }
-    @Override
-    public boolean handleKeyUp(KeyEvent event) {
-        return true;
-    }
     //----------------------------------------------------------------------------------------------
-    //모션입력
     @Override
     public boolean onGenericMotionEvent(MotionEvent event) {
         return handleMotionEvent(null, event) || super.onGenericMotionEvent(event);
     }
-    //포함되는 이벤트 : s펜 호버링
     @Override
     public boolean onGenericMotion(View view, MotionEvent event) {
         switch (event.getToolType(0)) {
@@ -1653,7 +1655,6 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                 streamView.requestPointerCapture();
                 break;
             case MotionEvent.TOOL_TYPE_STYLUS:
-                streamView.releasePointerCapture();
                 stylusHandler(view, event);
                 break;
             default:
@@ -1661,29 +1662,36 @@ public class Game extends Activity implements SurfaceHolder.Callback,
         return handleMotionEvent(view,event);
     }
     //----------------------------------------------------------------------------------------------
-    //화면 터치 입력
     @Override
-    public boolean onTouchEvent( MotionEvent event) {
+    public boolean onTouchEvent(MotionEvent event) {
+
+        Display display = getWindowManager().getDefaultDisplay();
+
+        Point size = new Point();
+
+        display.getSize(size);
 
         short eventY = 0 ;
-        if((event.getY()-(1848-(streamView.getHeight()))<0)){
+
+        float y = 0;
+        if(Build.MODEL.equals("SM-X906N")||Build.MODEL.equals("SM-X900")){
+            y = 1848;
+        }
+        else {
+            y = size.y;
+        }
+
+        if((event.getY()-(y-(streamView.getHeight()))<0)){
             eventY = (short) 0;
         }
         else {
-
-            eventY = (short) (event.getY()-(1848-(streamView.getHeight())));
+            eventY = (short) (event.getY()-(y-(streamView.getHeight())));
         }
 
-        System.out.println(streamView.getHeight());
 
         mousePositionSender((short) event.getX() ,eventY);
-        //stylusHandler(null, event);
-
-
-
         return handleMotionEvent(null, event) || super.onTouchEvent(event);
     }
-    //포함되는 이벤트 : s펜 입력,화면터치
     @SuppressLint("ClickableViewAccessibility")
     @Override
     public boolean onTouch(View view, MotionEvent event) {
@@ -1695,19 +1703,15 @@ public class Game extends Activity implements SurfaceHolder.Callback,
         return handleMotionEvent(view, event);
     }
     //----------------------------------------------------------------------------------------------
-    //에어액션
-    //에어액션 버튼 이벤트 리스너
     private SpenEventListener mButtonEventListener = event -> {
         ButtonEvent button = new ButtonEvent(event);
         airActionButtonHandler(button);
     };
-    //에어액션 모션 이벤트 리스너
     private SpenEventListener mAirMotionEventListener = event -> {
         AirMotionEvent airMotion = new AirMotionEvent(event);
         airActionMoveHandler(airMotion);
     };
     //----------------------------------------------------------------------------------------------
-    //포인터 캡쳐
     public boolean pointerCaptureInputManager(View view, MotionEvent event) {
         switch (event.getToolType(0)) {
             case MotionEvent.TOOL_TYPE_MOUSE:
@@ -1718,7 +1722,7 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                 break;
             case MotionEvent.TOOL_TYPE_STYLUS:
                 //포인터 캡쳐 시스템이 완성되기 전까지 레거시 포인터 인풋을 사용합니다.
-                //streamView.releasePointerCapture();
+                pointerCaptureOff();
                 break;
             default:
         }
@@ -1727,8 +1731,6 @@ public class Game extends Activity implements SurfaceHolder.Callback,
     //----------------------------------------------------------------------------------------------
     //----------------------------------------------------------------------------------------------
     // Input Sender Pool
-
-    // 프로그램 구조상 가장 아래에 있어야 하지만 변환기의 함수가 너무길어 변환기 함수 위에 배치했습니다.
     public static void keyboardDownSender(int keycode, byte Combination) {
         short translated = KeyboardTranslator.translate(keycode);
         conn.sendKeyboardInput(translated, KeyboardPacket.KEY_DOWN,
@@ -1741,7 +1743,6 @@ public class Game extends Activity implements SurfaceHolder.Callback,
     public void mousePositionSender(short x, short y) {
         conn.sendMousePosition(x, y,(short) viewWidth, (short) viewHeight);
     }
-    public static float hz;
     public static void mouseMoveSender(short DeltaX, short DeltaY) {
         conn.sendMouseMove(DeltaX, DeltaY);
     }
@@ -1757,11 +1758,7 @@ public class Game extends Activity implements SurfaceHolder.Callback,
     //----------------------------------------------------------------------------------------------
     //----------------------------------------------------------------------------------------------
     // Input Signal Handler Pool
-    // 키 입력을 관리합니다.
-    // 시스템으로 보낼 키 입력은 인풋 신호 매니저에서 관리하세요
     public boolean keyboardHandler(KeyEvent event) {
-        //키 이벤트를 송신기로 보냅니다.
-        //키 조합 변환기
         if (event.getKeyCode() == KeyEvent.KEYCODE_SETTINGS) {
             if (event.getAction() == KeyEvent.ACTION_DOWN) {
                 sendSettings();
@@ -1785,7 +1782,15 @@ public class Game extends Activity implements SurfaceHolder.Callback,
             return true;
         }
         //viewApp
-        if(event.getKeyCode() == 1004 && event.getAction() == KeyEvent.ACTION_DOWN){
+        if(event.getKeyCode() == 1002 && event.getAction() == KeyEvent.ACTION_DOWN){
+            if(mouseSendMode == 0){
+                mouseSendMode = 1;
+                Toast.makeText(mContext,"Position Mode", Toast.LENGTH_SHORT);
+            }
+            else if(mouseSendMode == 1) {
+                mouseSendMode = 0;
+                Toast.makeText(mContext,"Move Mode", Toast.LENGTH_SHORT);
+            }
             return true;
         }
         //Finder
@@ -1793,17 +1798,15 @@ public class Game extends Activity implements SurfaceHolder.Callback,
             sendSearch();
             return true;
         }
-        //Dex
+        // Dex
         if (event.getKeyCode() == 1084 && event.getAction() == KeyEvent.ACTION_DOWN) {
             return true;
         }
-        //북커버 View Keyboard 키 안드로이드 공식문서에 없음
+        // 북커버 View Keyboard 키 안드로이드 공식문서에 없음
         if(event.getKeyCode() == 1006 && event.getAction() == KeyEvent.ACTION_DOWN){
             airActionModeToggle();
             return true;
         }
-
-        // 키 이벤트를 보냅니다.
         if (event.getAction() == KeyEvent.ACTION_DOWN) {
             keyboardDownSender(event.getKeyCode(), keyBoardCombinationConverter(event));
         } else if (event.getAction() == KeyEvent.ACTION_UP) {
@@ -1812,16 +1815,73 @@ public class Game extends Activity implements SurfaceHolder.Callback,
         return true;
     }
 
-    // 마우스 입력을 관리합니다.
-    public void mouseHandler(View view, MotionEvent event) {
-        //움직임 송신
-        mouseMoveSender((short) event.getAxisValue(MotionEvent.AXIS_RELATIVE_X),
-                (short) event.getAxisValue(MotionEvent.AXIS_RELATIVE_Y));
+    public void mouseMoveDataConverter(short DeltaX , short DeltaY ){
 
-        //버튼,스크롤 송신
+        if(mouseSendMode ==0){
+            mouseMoveSender(DeltaX, DeltaY);
+        }
+        else {
+
+            pointer.setVisibility(View.VISIBLE);
+            if(hidePointerTimer != null){
+                hidePointerTimer.cancel();
+                hidePointerTimer = null;
+            }
+
+            hidePointerTimer = new Timer(true);
+            Handler handler = new Handler();
+            hidePointerTimer.schedule(new TimerTask() {
+                @Override
+                public void run() {
+                    handler.post(new Runnable() {
+                        public void run() {
+                            hidePointer = false;
+                            pointer.setVisibility(View.GONE);
+                        }
+                    });
+                }
+            }, 3000);
+
+
+            mousePositionX += DeltaX;
+            mousePositionY += DeltaY;
+
+            if(mousePositionX < 0 ){
+                mousePositionX = 0;
+            }
+            else if(mousePositionX > viewWidth){
+                mousePositionX = (short) viewWidth;
+            }
+            if(mousePositionY < 0 ){
+                mousePositionY = 0;
+            }
+            else if(mousePositionY > viewHeight){
+                mousePositionY = (short) viewHeight;
+            }
+            pointer.setX(mousePositionX);
+            pointer.setY(mousePositionY+28);
+            mousePositionSender(mousePositionX,mousePositionY);
+
+        }
+    }
+
+    public void mouseHandler(View view, MotionEvent event) {
+        
+        float x = event.getAxisValue(MotionEvent.AXIS_RELATIVE_X);
+        for (int i = 0; i < event.getHistorySize(); i++) {
+            x += event.getHistoricalAxisValue(MotionEvent.AXIS_RELATIVE_X, i);
+        }
+
+        float y = event.getAxisValue(MotionEvent.AXIS_RELATIVE_Y);
+        for (int i = 0; i < event.getHistorySize(); i++) {
+            y += event.getHistoricalAxisValue(MotionEvent.AXIS_RELATIVE_Y, i);
+        }
+
+        mouseMoveDataConverter((short) x, (short) y);
+
+
         switch (event.getAction()) {
             case MotionEvent.ACTION_BUTTON_PRESS:
-                // 안드로이드 키 신호를 문라이트 코어 시스템에 맞게 변환합니다.
                 mouseButtonDownSender(mouseButtonDownManager(view, event));
                 break;
             case MotionEvent.ACTION_BUTTON_RELEASE:
@@ -1832,19 +1892,12 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                 break;
         }
     }
-    // Raw 데이터 처리함수가 너무 길어 바로 변환기로 보냅니다
-    // 프로그램 구조를 명확히 하기위해 중간 연결 메서드를 만들어 둡니다.
     public void trackpadHandler(View view, MotionEvent event){
         trackpadConverter(view,event);
     }
-    //현재 위치요소만 있습니다.
-    //버튼 입력은 현재 레거시 시스템에 의존하고 있습니다.
-    //포인터 캡쳐 기반으로 변경되면 이 메서드에 추가하십시오
     public void stylusHandler(View view, MotionEvent event) {
         mousePositionSender((short) (event.getX()),(short) (event.getY()));
     }
-    // Raw 데이터 처리함수가 너무 길어 바로 변환기로 보냅니다
-    // 프로그램 구조를 명확히 하기위해 중간 연결 메서드를 만들어 둡니다.
     public void airActionButtonHandler(ButtonEvent button) {
         airActionConverter(button);
     }
@@ -1857,8 +1910,7 @@ public class Game extends Activity implements SurfaceHolder.Callback,
     //----------------------------------------------------------------------------------------------
     //----------------------------------------------------------------------------------------------
     // Input Data Converter
-    public static byte keyBoardCombinationConverter(KeyEvent event){
-        //키 조합을 Geforce 프로토콜에 맞게 설정합니다.
+    public byte keyBoardCombinationConverter(KeyEvent event){
         if (event.getKeyCode() == KeyEvent.KEYCODE_SHIFT_LEFT ||
                 event.getKeyCode() == KeyEvent.KEYCODE_SHIFT_RIGHT){
             if (event.getAction() == KeyEvent.ACTION_DOWN) {
@@ -1914,7 +1966,7 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                 event.getKeyCode() == KeyEvent.KEYCODE_META_RIGHT){
             if (event.getAction() == KeyEvent.ACTION_DOWN) {
                 if(KeyCombination >= 0 && KeyCombination <= 7){
-                    KeyCombination =KeyCombination+ 8;
+                    KeyCombination = KeyCombination+ 8;
                 }
             }
             else if (event.getAction() == KeyEvent.ACTION_UP) {
@@ -1923,23 +1975,28 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                 }
             }
         }
+        //Quit
+        if(KeyCombination == 7&&
+                event.getKeyCode() == KeyEvent.KEYCODE_Q &&
+                event.getAction() == KeyEvent.ACTION_DOWN){
+            mActivity.finish();
+
+
+        }
+        System.out.println(KeyCombination +""+event.getKeyCode()+""+ event.getAction());
         return (byte) KeyCombination;
     }
 
-    // 키보드 이벤트
     public static void sendShortcutKey(int keycode, byte keyState, byte modifier) {
         short translated = KeyboardTranslator.translate(keycode);
-        conn.sendKeyboardInput(translated,
-                keyState, modifier);
+        conn.sendKeyboardInput(translated, keyState, modifier);
     }
-
     public void sendWinTap() {
         sendShortcutKey(KeyEvent.KEYCODE_META_LEFT, KeyboardPacket.KEY_DOWN, (byte) 0x08);
         sendShortcutKey(KeyEvent.KEYCODE_TAB, KeyboardPacket.KEY_DOWN, (byte) 0x08);
         sendShortcutKey(KeyEvent.KEYCODE_TAB, KeyboardPacket.KEY_UP, (byte) 0x0);
         sendShortcutKey(KeyEvent.KEYCODE_META_LEFT, KeyboardPacket.KEY_UP, (byte) 0x0);
     }
-
     public void sendScreenShot() {
         sendShortcutKey(KeyEvent.KEYCODE_META_LEFT, KeyboardPacket.KEY_DOWN, (byte) 0x08);
         sendShortcutKey(KeyEvent.KEYCODE_SHIFT_LEFT, KeyboardPacket.KEY_DOWN, (byte) 0x09);
@@ -1948,53 +2005,44 @@ public class Game extends Activity implements SurfaceHolder.Callback,
         sendShortcutKey(KeyEvent.KEYCODE_SHIFT_LEFT, KeyboardPacket.KEY_UP, (byte) 0x08);
         sendShortcutKey(KeyEvent.KEYCODE_META_LEFT, KeyboardPacket.KEY_UP, (byte) 0x0);
     }
-
     public void sendSearch() {
         sendShortcutKey(KeyEvent.KEYCODE_META_LEFT, KeyboardPacket.KEY_DOWN, (byte) 0x08);
         sendShortcutKey(KeyEvent.KEYCODE_S, KeyboardPacket.KEY_DOWN, (byte) 0x08);
         sendShortcutKey(KeyEvent.KEYCODE_S, KeyboardPacket.KEY_UP, (byte) 0x08);
         sendShortcutKey(KeyEvent.KEYCODE_META_LEFT, KeyboardPacket.KEY_UP, (byte) 0x0);
     }
-
     public void sendExplorer() {
         sendShortcutKey(KeyEvent.KEYCODE_META_LEFT, KeyboardPacket.KEY_DOWN, (byte) 0x08);
         sendShortcutKey(KeyEvent.KEYCODE_E, KeyboardPacket.KEY_DOWN, (byte) 0x08);
         sendShortcutKey(KeyEvent.KEYCODE_E, KeyboardPacket.KEY_UP, (byte) 0x08);
         sendShortcutKey(KeyEvent.KEYCODE_META_LEFT, KeyboardPacket.KEY_UP, (byte) 0x0);
     }
-
     public void sendSettings() {
         sendShortcutKey(KeyEvent.KEYCODE_META_LEFT, KeyboardPacket.KEY_DOWN, (byte) 0x08);
         sendShortcutKey(KeyEvent.KEYCODE_I, KeyboardPacket.KEY_DOWN, (byte) 0x08);
         sendShortcutKey(KeyEvent.KEYCODE_I, KeyboardPacket.KEY_UP, (byte) 0x08);
         sendShortcutKey(KeyEvent.KEYCODE_META_LEFT, KeyboardPacket.KEY_UP, (byte) 0x0);
     }
-
     public void sendDesktop() {
         sendShortcutKey(KeyEvent.KEYCODE_META_LEFT, KeyboardPacket.KEY_DOWN, (byte) 0x08);
         sendShortcutKey(KeyEvent.KEYCODE_D, KeyboardPacket.KEY_DOWN, (byte) 0x08);
         sendShortcutKey(KeyEvent.KEYCODE_D, KeyboardPacket.KEY_UP, (byte) 0x0);
         sendShortcutKey(KeyEvent.KEYCODE_META_LEFT, KeyboardPacket.KEY_UP, (byte) 0x0);
     }
-    //마우스 버튼 다중 입력 신호 변환기
+    //----------------------------------------------------------------------------------------------
     public byte mouseButtonDownManager(View view, MotionEvent event) {
         byte buttonIndex = 0x00;
         if (event.getAction() == MotionEvent.ACTION_BUTTON_PRESS) {
             switch (event.getButtonState() - lastButtonDown) {
-                case 1:
-                    buttonIndex = 0x01;
+                case 1: buttonIndex = 0x01;
                     break;
-                case 2:
-                    buttonIndex = 0x03;
+                case 2: buttonIndex = 0x03;
                     break;
-                case 4:
-                    buttonIndex = 0x02;
+                case 4: buttonIndex = 0x02;
                     break;
-                case 8:
-                    buttonIndex = 0x04;
+                case 8: buttonIndex = 0x04;
                     break;
-                case 16:
-                    buttonIndex = 0x05;
+                case 16: buttonIndex = 0x05;
                     break;
             }
             lastButtonDown = event.getButtonState();
@@ -2005,20 +2053,15 @@ public class Game extends Activity implements SurfaceHolder.Callback,
         byte buttonIndex = 0x00;
         if (event.getAction() == MotionEvent.ACTION_BUTTON_RELEASE) {
             switch (lastButtonDown - event.getButtonState()) {
-                case 1:
-                    buttonIndex = 0x01;
+                case 1: buttonIndex = 0x01;
                     break;
-                case 2:
-                    buttonIndex = 0x03;
+                case 2: buttonIndex = 0x03;
                     break;
-                case 4:
-                    buttonIndex = 0x02;
+                case 4: buttonIndex = 0x02;
                     break;
-                case 8:
-                    buttonIndex = 0x04;
+                case 8: buttonIndex = 0x04;
                     break;
-                case 16:
-                    buttonIndex = 0x05;
+                case 16: buttonIndex = 0x05;
                     break;
             }
             lastButtonDown = event.getButtonState();
@@ -2026,16 +2069,34 @@ public class Game extends Activity implements SurfaceHolder.Callback,
         return buttonIndex;
     }
     //----------------------------------------------------------------------------------------------
-    //트랙패드 입력을 관리합니다.
+    public float trackPad_LastMoveEventTime;
+
     public void trackpadConverter(View view, MotionEvent event) {
-        // 트랙패드 움직임 전송
+
         if (trackPad_Move) {
-            mouseMoveSender((short) event.getAxisValue(MotionEvent.AXIS_RELATIVE_Y),
-                    (short) -event.getAxisValue(MotionEvent.AXIS_RELATIVE_X));
+            if((SystemClock.uptimeMillis() - trackPad_LastMoveEventTime) < 100 ){
+
+                float x = event.getAxisValue(MotionEvent.AXIS_RELATIVE_X);
+                for (int i = 0; i < event.getHistorySize(); i++) {
+                    x += event.getHistoricalAxisValue(MotionEvent.AXIS_RELATIVE_X, i);
+                }
+
+                float y = event.getAxisValue(MotionEvent.AXIS_RELATIVE_Y);
+                for (int i = 0; i < event.getHistorySize(); i++) {
+                    y += event.getHistoricalAxisValue(MotionEvent.AXIS_RELATIVE_Y, i);
+                }
+
+
+                mouseMoveDataConverter((short) (y*(trackPad_SENSE/1000)),
+                        (short) (-x*(trackPad_SENSE/1000)));
+
+
+            }
+
+            trackPad_LastMoveEventTime = SystemClock.uptimeMillis();
+
         }
-        // 손가락이 1개일때
         if (event.getPointerCount() == 1) {
-            // 손가락이 1개일때 버튼 처리 : 마우스와 동일하게 작동
             switch (event.getAction()) {
                 case MotionEvent.ACTION_BUTTON_PRESS:
                     mouseButtonDownSender(mouseButtonDownManager(view, event));
@@ -2064,16 +2125,13 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                         }
                     }
                 }
-
                 trackPad_Single_DownStatus = true;
                 padMoveStatus = false;
-
                 // 손가락이 닿을때 절대 위치를 기록합니다.
                 // 자동이동메서드의 방향 구분에 사용됩니다.
                 trackPad_Single_StartRawX = event.getRawX();
                 trackPad_Single_StartRawY = event.getRawY();
             }
-
             //손가락이 떨어질 때
             if (event.getAction() == MotionEvent.ACTION_UP) {
                 if (!trackPad_Single_EventQueue) {
@@ -2114,14 +2172,12 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                 trackPad_Global_One_Time_Event = false;
                 trackPadReset(view, event);
             }
-
             // 드래그
             // 자동이동 방향 결정
             float dragRightLength = (event.getRawY() - trackPad_Single_StartRawY);
             float dragLeftLength = -(event.getRawY() - trackPad_Single_StartRawY);
             float dragUpLength = (event.getRawX() - trackPad_Single_StartRawX);
             float dragDownLength = -(event.getRawX() - trackPad_Single_StartRawX);
-
             // 포인터 자동이동 방향
             short autoMoveDirection = 0;
             if (dragRightLength > dragLeftLength && dragRightLength > dragUpLength &&
@@ -2140,20 +2196,18 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                     dragDownLength > dragRightLength) {
                 autoMoveDirection = 4;
             }
-
             //움직임 상태확인
             //자동 움직임이 활성화 되면 움직임 신호를 멈춤
             if (!padMoveStatus) {
                 //패드 타이머를 끈다
                 padTimer = false;
             }
-
             //속도
             //손가락이 멈출때를 감지합니다.
             //멈추고 1초 뒤입니다.
             //영역 도달후 1초뒤가 아닙니다.
-            if (((event.getRawX() - trackPad_Single_EndRawX) > 5 || (event.getRawX() - trackPad_Single_EndRawX) < -5) ||
-                    ((event.getRawY() - trackPad_Single_EndRawY) > 5 || (event.getRawY() - trackPad_Single_EndRawY) < -5)) {
+            if (((event.getRawX() - trackPad_Single_EndRawX) > 10 || (event.getRawX() - trackPad_Single_EndRawX) < -10) ||
+                    ((event.getRawY() - trackPad_Single_EndRawY) > 10 || (event.getRawY() - trackPad_Single_EndRawY) < -10)) {
                 padTimer = false;
                 //빠른속도로 포인터를 움직이면 취소됩니다.
                 if (tapDownTimer != null) {
@@ -2170,11 +2224,14 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                     if (event.getRawX() < 590 || event.getRawX() > 1500 ||
                             event.getRawY() > 1700 || event.getRawY() < 100) {
                         stopAutoMove = false;
-                        dragPadPointerCapture(autoMoveDirection);
+                        autoMovePointer(autoMoveDirection);
                     } else {
                         padTimer = false;
                         padMoveStatus = false;
-                        stopAutoMove = true;
+                        if(tapDownTimer != null){
+                            tapDownTimer.cancel();
+                            tapDownTimer = null;
+                        }
                     }
                 }
             }
@@ -2188,7 +2245,6 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                 trackPad_Move = true;
                 conn.sendMouseButtonDown(MouseButtonPacket.BUTTON_MIDDLE);
             }
-
             //터치 업
             //마우스 오른쪽 버튼
             if (event.getAction() == 262 || event.getAction() == 6) {
@@ -2230,7 +2286,7 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                     if (trackPad_Double_Mode_0 == 0) {
                         //상하 스크롤모드
                         //현재 위치- 처음위치 1번 이동
-                        conn.sendMouseHighResScroll((short) ((PadScroll - event.getRawX()) * 3));
+                        conn.sendMouseHighResScroll((short) ((PadScroll - event.getRawX()) * trackPad_SCROLL/1000));
                         PadScroll = event.getRawX();
                         if ((event.getRawY() - PadScrollY) > 150 || (event.getRawY() - PadScrollY) < -150) {
                             trackPad_Double_Mode_0 = 1;
@@ -2251,7 +2307,7 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                         // 드래그 속도에 따라 좌우스크롤과 앞으로가기 뒤로가기를 구분합니다.
                         if (((event.getRawY() - trackPad_Single_EndRawY) < 25 && (event.getRawY() - trackPad_Single_EndRawY) > -25)) {
                             conn.sendKeyboardInput((short) 0xA0, KeyboardPacket.KEY_DOWN, (byte) 0);
-                            conn.sendMouseHighResScroll((short) ((event.getRawY() - PadScrollY) * 5));
+                            conn.sendMouseHighResScroll((short) ((event.getRawY() - PadScrollY) * trackPad_SCROLL/1000));
                             PadScrollY = event.getRawY();
                         } else if (!trackPad_Global_One_Time_Event){
                             //가장자리
@@ -2369,47 +2425,32 @@ public class Game extends Activity implements SurfaceHolder.Callback,
             }
         }
     }
-    //트랙패드 자동이동 메서드
-    public void dragPadPointerCapture(short autoMoveDirection) {
-        if (trackPad_Single_DownStatus && padTimer) {
+    public void autoMovePointer(short autoMoveDirection) {
+        if ((trackPad_Single_DownStatus && padTimer)&& !trackPad_Global_One_Time_Event ) {
+            trackPad_Global_One_Time_Event = true;
             tapDownTimer = new Timer(true);
             tapDownTimer.schedule(new TimerTask() {
                 @Override
                 public void run() {
-                    for (int i = 0; true;) {
-                        //마지막으로 실행한 시간과 현재시간의 차가 10ms 일때만 실행합니다.
-                        if(SystemClock.uptimeMillis() - trackPad_Single_autoMoveEventTime > trackPad_autoMoveInterval){
-                            padMoveStatus = true;
-                            switch (autoMoveDirection) {
-                                case 1:
-                                    conn.sendMouseMove((short) (1), (short) 0);
-                                    break;
-                                case 2:
-                                    conn.sendMouseMove((short) (-1), (short) 0);
-                                    break;
-                                case 3:
-                                    conn.sendMouseMove((short) (0), (short) -1);
-                                    break;
-                                case 4:
-                                    conn.sendMouseMove((short) (0), (short) 1);
-                                    break;
-                            }
-                            trackPad_Single_autoMoveEventTime = SystemClock.uptimeMillis();
-                        }
-                        if (!trackPad_Single_DownStatus || stopAutoMove) {
-                            if (tapDownTimer != null) {
-                                tapDownTimer.cancel();
-                                tapDownTimer = null;
-                            }
+                    padMoveStatus = true;
+                    switch (autoMoveDirection) {
+                        case 1:
+                            conn.sendMouseMove((short) (1), (short) 0);
                             break;
-                        }
+                        case 2:
+                            conn.sendMouseMove((short) (-1), (short) 0);
+                            break;
+                        case 3:
+                            conn.sendMouseMove((short) (0), (short) -1);
+                            break;
+                        case 4:
+                            conn.sendMouseMove((short) (0), (short) 1);
+                            break;
                     }
                 }
-            }, 1000);
+            }, 1000,trackPad_autoMoveInterval);
         }
     }
-
-    //트랙패드 리셋 메서드
     private void trackPadReset(View view, MotionEvent event) {
         mouseButtonUpSender(MouseButtonPacket.BUTTON_MIDDLE);
         conn.sendKeyboardInput((short) 0xA0, KeyboardPacket.KEY_UP, (byte) 0);
@@ -2425,15 +2466,18 @@ public class Game extends Activity implements SurfaceHolder.Callback,
         trackPad_Double_One_Time_Event = false;
         trackPad_Global_One_Time_Event = false;
         trackPad_Double_Start_PointToPointDistance = trackPad_Triple_StartRawX = trackPad_Triple_StartRawY = trackPad_Triple_Mode = 0;
+        if (tapDownTimer != null) {
+            tapDownTimer.cancel();
+            tapDownTimer = null;
+        }
     }
     //----------------------------------------------------------------------------------------------
-    //에어액션 컨버터
     public void airActionModeToggle(){
         switch (airAction_Mode){
             case 0:
                 airAction_Mode = 1;
                 Toast.makeText(mContext, "에어액션 포인터 모드가 켜졌습니다.", Toast.LENGTH_SHORT).show();
-                spenButtonConnectOn();
+                AirActionButtonServiceOn();
                 break;
             case 1:
                 airAction_Mode = 2;
@@ -2443,32 +2487,27 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                 airAction_Mode = 3;
                 Toast.makeText(mContext, "에어액션 제스쳐 모드가 켜졌습니다.", Toast.LENGTH_SHORT).show();
                 break;
-
             default:
                 Toast.makeText(mContext, "에어액션이 꺼졌습니다.", Toast.LENGTH_SHORT).show();
-                airActionServiceReset();
+                resetAirActionService();
                 break;
         }
     }
-
     public void airActionConverter(ButtonEvent button) {
         //------------------------------------------------------------------------------------------
         // 포인터 모드
         if(airAction_Mode == 1){
             if (button.getAction() == ButtonEvent.ACTION_DOWN){
-
                 if (airAction_ButtonUpInputWaitingTime != null) {
                     airAction_ButtonUpInputWaitingTime.cancel();
                     airAction_ButtonUpInputWaitingTime = null;
                 }
-
                 if(airAction_ButtonUpInput){
                     airAction_ButtonUpInput = false;
                     // 포인터 신호 송신을 허용합니다.
                     airAction_Move = true;
-                    spenMotionConnectOn();
+                    AirActionMotionServiceOn();
                     //타이머 끔
-
                     if (airAction_DisableMotionListening != null) {
                         airAction_DisableMotionListening.cancel();
                         airAction_DisableMotionListening = null;
@@ -2496,19 +2535,16 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                         airAction_DisableMotionListening.schedule(new TimerTask() {
                             @Override
                             public void run() {
-                                spenMotionConnectOff();
+                                AirActionMotionServiceOff();
                             }
                         }, airAction_DisableMotionListeningWaitTime);
-
                         mousePositionSender((short) (viewWidth-1), (short) (viewHeight-1));
-
                         keyboardDownSender(KeyEvent.KEYCODE_CTRL_LEFT, KeyboardPacket.MODIFIER_CTRL);
                         keyboardDownSender(KeyEvent.KEYCODE_L, KeyboardPacket.MODIFIER_CTRL);
                         keyboardUpSender(KeyEvent.KEYCODE_L, KeyboardPacket.MODIFIER_CTRL);
                         keyboardUpSender(KeyEvent.KEYCODE_CTRL_LEFT, (byte) 0);
                     }
                 }, 150);
-
             }
         }
         //------------------------------------------------------------------------------------------
@@ -2523,7 +2559,7 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                     }
                 }, 200);
                 //모션 켬
-                spenMotionConnectOn();
+                AirActionMotionServiceOn();
                 //타이머 끔
                 if (airAction_DisableMotionListening != null) {
                     airAction_DisableMotionListening.cancel();
@@ -2564,7 +2600,7 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                 airAction_DisableMotionListening.schedule(new TimerTask() {
                     @Override
                     public void run() {
-                        spenMotionConnectOff();
+                        AirActionMotionServiceOff();
                     }
                 }, airAction_DisableMotionListeningWaitTime);
                 if (!trackPad_Single_EventQueue) {
@@ -2610,10 +2646,10 @@ public class Game extends Activity implements SurfaceHolder.Callback,
         //제스쳐모드
         if (airAction_Mode == 3) {
             if (button.getAction() == ButtonEvent.ACTION_DOWN) {
-                spenMotionConnectOn();
+                AirActionMotionServiceOn();
                 airAction_Move = false;
-
-            }else {
+            }
+            else {
                 //제스쳐모드
                 if (airAction_Mode == 3) {
                     if (airAction_DisableMotionListening != null) {
@@ -2624,16 +2660,15 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                     airAction_DisableMotionListening.schedule(new TimerTask() {
                         @Override
                         public void run() {
-                            spenMotionConnectOff();
+                            AirActionMotionServiceOff();
                         }
-                    }, airAction_MoveSpeed);
+                    }, airAction_DisableMotionListeningWaitTime);
                 }
             }
         }
     }
-
     //----------------------------------------------------------------------------------------------
-    //레거시 입력 시스템
+    // Legacy
     private boolean handleMotionEvent(View view, MotionEvent event) {
         //인풋캡쳐 토글
         if (!grabbedInput) {
@@ -2659,7 +2694,6 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                                     event.getToolType(0) == MotionEvent.TOOL_TYPE_STYLUS ||
                                     event.getToolType(0) == MotionEvent.TOOL_TYPE_ERASER))) {
                 int changedButtons = event.getButtonState() ^ lastButtonState;
-
                 // Mouse secondary or stylus primary is right click (stylus down is left click)
                 if ((changedButtons & (MotionEvent.BUTTON_SECONDARY | MotionEvent.BUTTON_STYLUS_PRIMARY)) != 0) {
                     if ((event.getButtonState() & (MotionEvent.BUTTON_SECONDARY | MotionEvent.BUTTON_STYLUS_PRIMARY)) != 0) {
@@ -2668,7 +2702,6 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                         conn.sendMouseButtonUp(MouseButtonPacket.BUTTON_RIGHT);
                     }
                 }
-
                 // Handle stylus presses
                 if (event.getPointerCount() == 1 && event.getActionIndex() == 0) {
                     if (event.getActionMasked() == MotionEvent.ACTION_DOWN) {
@@ -2823,15 +2856,13 @@ public class Game extends Activity implements SurfaceHolder.Callback,
         // Unknown class
         return false;
     }
-    //(레거시) 소프트 키보드 출력 함수
+    // Legacy 소프트 키보드 출력 함수
     @Override
     public void showKeyboard() {
         LimeLog.info("Showing keyboard overlay");
         InputMethodManager inputManager = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
         inputManager.toggleSoftInput(InputMethodManager.SHOW_FORCED, InputMethodManager.HIDE_IMPLICIT_ONLY);
     }
-
-    //터치 관련 함수
     private TouchContext getTouchContext(int actionIndex) {
         if (actionIndex < touchContextMap.length) {
             return touchContextMap[actionIndex];
@@ -2839,11 +2870,202 @@ public class Game extends Activity implements SurfaceHolder.Callback,
             return null;
         }
     }
-    //----------------------------------------------------------------------------------------------
-    //----------------------------------------------------------------------------------------------
-    //----------------------------------------------------------------------------------------------
-    // StatusInfo
+    @Override
+    public boolean handleKeyDown(KeyEvent event) {
+        // Pass-through virtual navigation keys
+        if ((event.getFlags() & KeyEvent.FLAG_VIRTUAL_HARD_KEY) != 0) {
+            return false;
+        }
+        // Handle a synthetic back button event that some Android OS versions
+        // create as a result of a right-click. This event WILL repeat if
+        // the right mouse button is held down, so we ignore those.
+        int eventSource = event.getSource();
+        if ((eventSource == InputDevice.SOURCE_MOUSE ||
+                eventSource == InputDevice.SOURCE_MOUSE_RELATIVE) &&
+                event.getKeyCode() == KeyEvent.KEYCODE_BACK) {
+            // Send the right mouse button event if mouse back and forward
+            // are disabled. If they are enabled, handleMotionEvent() will take
+            // care of this.
+            if (!prefConfig.mouseNavButtons) {
+                conn.sendMouseButtonDown(MouseButtonPacket.BUTTON_RIGHT);
+            }
+            // Always return true, otherwise the back press will be propagated
+            // up to the parent and finish the activity.
+            return true;
+        }
+        boolean handled = false;
+        if (ControllerHandler.isGameControllerDevice(event.getDevice())) {
+            // Always try the controller handler first, unless it's an alphanumeric keyboard device.
+            // Otherwise, controller handler will eat keyboard d-pad events.
+            handled = controllerHandler.handleButtonDown(event);
+        }
+        if (!handled) {
+            // Try the keyboard handler
+            short translated = KeyboardTranslator.translate(event.getKeyCode());
+            if (translated == 0) {
+                return false;
+            }
+            // Let this method take duplicate key down events
+            if (handleSpecialKeys(event.getKeyCode(), true)) {
+                return true;
+            }
+            // Eat repeat down events
+            if (event.getRepeatCount() > 0) {
+                return true;
+            }
+            // Pass through keyboard input if we're not grabbing
+            if (!grabbedInput) {
+                return false;
+            }
+            byte modifiers = getModifierState(event);
+            if (KeyboardTranslator.needsShift(event.getKeyCode())) {
+                modifiers |= KeyboardPacket.MODIFIER_SHIFT;
+            }
+            conn.sendKeyboardInput(translated, KeyboardPacket.KEY_DOWN, modifiers);
+        }
+        return true;
+    }
+    @Override
+    public boolean handleKeyUp(KeyEvent event) {
+        // Pass-through virtual navigation keys
+        if ((event.getFlags() & KeyEvent.FLAG_VIRTUAL_HARD_KEY) != 0) {
+            return false;
+        }
+        // Handle a synthetic back button event that some Android OS versions
+        // create as a result of a right-click.
+        int eventSource = event.getSource();
+        if ((eventSource == InputDevice.SOURCE_MOUSE ||
+                eventSource == InputDevice.SOURCE_MOUSE_RELATIVE) &&
+                event.getKeyCode() == KeyEvent.KEYCODE_BACK) {
+            // Send the right mouse button event if mouse back and forward
+            // are disabled. If they are enabled, handleMotionEvent() will take
+            // care of this.
+            if (!prefConfig.mouseNavButtons) {
+                conn.sendMouseButtonUp(MouseButtonPacket.BUTTON_RIGHT);
+            }
+            // Always return true, otherwise the back press will be propagated
+            // up to the parent and finish the activity.
+            return true;
+        }
+        boolean handled = false;
+        if (ControllerHandler.isGameControllerDevice(event.getDevice())) {
+            // Always try the controller handler first, unless it's an alphanumeric keyboard device.
+            // Otherwise, controller handler will eat keyboard d-pad events.
+            handled = controllerHandler.handleButtonUp(event);
+        }
+        if (!handled) {
+            // Try the keyboard handler
+            short translated = KeyboardTranslator.translate(event.getKeyCode());
+            if (translated == 0) {
+                return false;
+            }
 
+            if (handleSpecialKeys(event.getKeyCode(), false)) {
+                return true;
+            }
+
+            // Pass through keyboard input if we're not grabbing
+            if (!grabbedInput) {
+                return false;
+            }
+
+            byte modifiers = getModifierState(event);
+            if (KeyboardTranslator.needsShift(event.getKeyCode())) {
+                modifiers |= KeyboardPacket.MODIFIER_SHIFT;
+            }
+            conn.sendKeyboardInput(translated, KeyboardPacket.KEY_UP, modifiers);
+        }
+        return true;
+    }
+    // Returns true if the key stroke was consumed
+    private boolean handleSpecialKeys(int androidKeyCode, boolean down) {
+        int modifierMask = 0;
+
+        if (androidKeyCode == KeyEvent.KEYCODE_CTRL_LEFT ||
+                androidKeyCode == KeyEvent.KEYCODE_CTRL_RIGHT) {
+            modifierMask = KeyboardPacket.MODIFIER_CTRL;
+        }
+        else if (androidKeyCode == KeyEvent.KEYCODE_SHIFT_LEFT ||
+                androidKeyCode == KeyEvent.KEYCODE_SHIFT_RIGHT) {
+            modifierMask = KeyboardPacket.MODIFIER_SHIFT;
+        }
+        else if (androidKeyCode == KeyEvent.KEYCODE_ALT_LEFT ||
+                androidKeyCode == KeyEvent.KEYCODE_ALT_RIGHT) {
+            modifierMask = KeyboardPacket.MODIFIER_ALT;
+        }
+
+        if (down) {
+            this.modifierFlags |= modifierMask;
+        }
+        else {
+            this.modifierFlags &= ~modifierMask;
+        }
+
+        // Check if Ctrl+Shift+Z is pressed
+        if (androidKeyCode == KeyEvent.KEYCODE_Z &&
+                (modifierFlags & (KeyboardPacket.MODIFIER_CTRL | KeyboardPacket.MODIFIER_SHIFT)) ==
+                        (KeyboardPacket.MODIFIER_CTRL | KeyboardPacket.MODIFIER_SHIFT))
+        {
+            if (down) {
+                // Now that we've pressed the magic combo
+                // we'll wait for one of the keys to come up
+                grabComboDown = true;
+            }
+            else {
+                // Toggle the grab if Z comes up
+                Handler h = getWindow().getDecorView().getHandler();
+                if (h != null) {
+                    h.postDelayed(toggleGrab, 250);
+                }
+                grabComboDown = false;
+            }
+
+            return true;
+        }
+        // Toggle the grab if control or shift comes up
+        else if (grabComboDown) {
+            Handler h = getWindow().getDecorView().getHandler();
+            if (h != null) {
+                h.postDelayed(toggleGrab, 250);
+            }
+
+            grabComboDown = false;
+            return true;
+        }
+
+        // Not a special combo
+        return false;
+    }
+
+    private byte getModifierState(KeyEvent event) {
+        // Start with the global modifier state to ensure we cover the case
+        // detailed in https://github.com/moonlight-stream/moonlight-android/issues/840
+        byte modifier = getModifierState();
+        if (event.isShiftPressed()) {
+            modifier |= KeyboardPacket.MODIFIER_SHIFT;
+        }
+        if (event.isCtrlPressed()) {
+            modifier |= KeyboardPacket.MODIFIER_CTRL;
+        }
+        if (event.isAltPressed()) {
+            modifier |= KeyboardPacket.MODIFIER_ALT;
+        }
+        return modifier;
+    }
+
+    private byte getModifierState() {
+        return (byte) modifierFlags;
+    }
+
+    private final Runnable toggleGrab = new Runnable() {
+        @Override
+        public void run() {
+
+            grabbedInput = !grabbedInput;
+        }
+    };
+    //______________________________________________________________________________________________
+    // StatusInfo
     public void AutoCallSec() {
         Timer timer = new Timer(true);
         Handler handler = new Handler();
@@ -2861,25 +3083,21 @@ public class Game extends Activity implements SurfaceHolder.Callback,
             }
         }, 0, 1000);
     }
-
+    //----------------------------------------------------------------------------------------------
     // SystemStatusInfo
     public boolean getBatteryCharge() {
         IntentFilter ifilter = new IntentFilter(Intent.ACTION_BATTERY_CHANGED);
         Intent batteryStatus = this.registerReceiver(null, ifilter);
-
         // Are we charging / charged?
         int status = batteryStatus.getIntExtra(BatteryManager.EXTRA_STATUS, -1);
         boolean isCharging = status == BatteryManager.BATTERY_STATUS_CHARGING ||
                 status == BatteryManager.BATTERY_STATUS_FULL;
-
         // How are we charging?
         int chargePlug = batteryStatus.getIntExtra(BatteryManager.EXTRA_PLUGGED, -1);
         boolean usbCharge = chargePlug == BatteryManager.BATTERY_PLUGGED_USB;
         boolean acCharge = chargePlug == BatteryManager.BATTERY_PLUGGED_AC;
-
         return isCharging;
     }
-
     public float getBatteryPct() {
         IntentFilter ifilter = new IntentFilter(Intent.ACTION_BATTERY_CHANGED);
         Intent batteryStatus = this.registerReceiver(null, ifilter);
@@ -2891,12 +3109,10 @@ public class Game extends Activity implements SurfaceHolder.Callback,
 
         return batteryPct;
     }
-
     public String getTimeDate() {
         SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd hh:mm");
         return sdf.format(new Date(System.currentTimeMillis()));
     }
-
     public short getHz() {
         int getHz = Settings.Secure.getInt(this.getContentResolver(), refershRateMode, 50);
         short hz;
@@ -2912,7 +3128,7 @@ public class Game extends Activity implements SurfaceHolder.Callback,
         }
         return hz;
     }
-
+    //----------------------------------------------------------------------------------------------
     // ConnectionStatusInfo
     @Override
     public void connectionStatusUpdate(final int connectionStatus) {
@@ -2958,13 +3174,13 @@ public class Game extends Activity implements SurfaceHolder.Callback,
             }
         });
     }
-
+    //----------------------------------------------------------------------------------------------
     // NetWorkStatusInfo
     private void networkStatus(){
         TotalTx = TrafficStats.getTotalTxBytes();
         TotalRx = TrafficStats.getTotalRxBytes();
     }
-
+    //----------------------------------------------------------------------------------------------
     // DecoderStatusInfo
     @Override
     public void onPerfUpdate(int resolutionWidth, int resolutionHeight, short totalFps,
@@ -2990,14 +3206,10 @@ public class Game extends Activity implements SurfaceHolder.Callback,
             }
         });
     }
-
-
-    //----------------------------------------------------------------------------------------------
-    //----------------------------------------------------------------------------------------------
+    //______________________________________________________________________________________________
     // Active
-
-    // 노치바 색상 업데이트
-    public void overlayBackground() {
+    // notch
+    public void notchBackground() {
         Timer timer = new Timer(true);
         Handler handler = new Handler();
         timer.schedule(new TimerTask() {
@@ -3008,7 +3220,7 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                         if (SurfaceViewState) {
                             if (!pixelCopyState) {
                                 pixelCopyState = true;
-                                capturePicture();
+                                notchViewCapture();
                             }
                         }
                     }
@@ -3016,63 +3228,72 @@ public class Game extends Activity implements SurfaceHolder.Callback,
             }
         }, 0, 8);
     }
-
-    //노치바용 저해상도 화면 캡쳐
-    public void capturePicture() {
+    public void notchViewCapture() {
         View surfaceView = streamView;
         int width = 2960;
-        Bitmap bmp = Bitmap.createBitmap(width+1, surfaceView.getHeight() / 8,
-                Bitmap.Config.RGB_565);
+        Bitmap bmp = Bitmap.createBitmap(2961, 1849,
+                Bitmap.Config.ARGB_8888);
         PixelCopy.request(streamView, bmp, i -> {
             int color1 = bmp.getPixel(width/2, 1);
+            float notchLeftLine = 0;
+            float notchRightLine = 0;
 
-            float norchLeftLine = 0;
-            float norchRightLine = 0;
+
+            if(pointer != null){
+                int pointerColor = bmp.getPixel((int)pointer.getX(),(int) pointer.getY());
+                if((Color.red(pointerColor) < 125 &&Color.green(pointerColor) < 125)&&
+                        Color.blue(pointerColor) < 125){
+                    pointer.setBackgroundColor(Color.WHITE);
+                }
+                else {
+                    pointer.setBackgroundColor(Color.BLACK);
+                }
+            }
+
 
             for(int b = width/2; b >=0 ; b--){
                 if(bmp.getPixel(b, 1) == -16777216){
-                    norchLeftLine = b;
+                    notchLeftLine = b;
                     break;
                 }
             }
-
             for(int c = width/2; c <= width; c++){
                 if(bmp.getPixel(c, 1) == -16777216){
-                   norchRightLine = c;
+                   notchRightLine = c;
                    break;
                 }
             }
-            if((norchLeftLine!=0 && norchRightLine!=0) &&
+            if((notchLeftLine!=0 && notchRightLine!=0) &&
                     (bmp.getPixel(5, 1)== -16777216 && bmp.getPixel((width-5), 1)== -16777216) &&
-                    (((norchLeftLine - (width-norchRightLine))<10)||((norchLeftLine - (width-norchRightLine))>-10))){
-                LinearLayout.LayoutParams param = new LinearLayout.LayoutParams((int) (norchRightLine-norchLeftLine), 28);
+                    (((notchLeftLine - (width-notchRightLine))<10)||((notchLeftLine - (width-notchRightLine))>-10))){
+                LinearLayout.LayoutParams param = new LinearLayout.LayoutParams((int) (notchRightLine-notchLeftLine), 28);
                 notchBackground.setLayoutParams(param);
                 notchBackground.setX(3);
-                norchLeft.setVisibility(View.GONE);
-                norchRight.setVisibility(View.GONE);
+                notchLeft.setVisibility(View.GONE);
+                notchRight.setVisibility(View.GONE);
             }
             else {
                 LinearLayout.LayoutParams param = new LinearLayout.LayoutParams(width, 28);
                 notchBackground.setLayoutParams(param);
                 notchBackground.setX(0);
-                norchLeft.setVisibility(View.VISIBLE);
-                norchRight.setVisibility(View.VISIBLE);
+                notchLeft.setVisibility(View.VISIBLE);
+                notchRight.setVisibility(View.VISIBLE);
             }
 
             if ((Color.red(color1) > 125 && Color.green(color1) > 125) && Color.blue(color1) > 125) {
-                norchLeft.setTextColor(Color.BLACK);
-                norchRight.setTextColor(Color.BLACK);
+                notchLeft.setTextColor(Color.BLACK);
+                notchRight.setTextColor(Color.BLACK);
             } else {
-                norchLeft.setTextColor(Color.WHITE);
-                norchRight.setTextColor(Color.WHITE);
+                notchLeft.setTextColor(Color.WHITE);
+                notchRight.setTextColor(Color.WHITE);
             }
             notchBackground.setBackgroundColor(color1);
             pixelCopyState = false;
             bmp.recycle();
         }, new Handler(Looper.getMainLooper()));
     }
-
-    // 가변 주사율
+    //----------------------------------------------------------------------------------------------
+    // RefreshRate
     public void autoRefreshRate() {
         if (SurfaceViewState) {
             if (gRenderedFps < 80) {
@@ -3083,8 +3304,8 @@ public class Game extends Activity implements SurfaceHolder.Callback,
             }
         }
     }
-
-    // 적절한 비트레이트 값을 구합니다.
+    //----------------------------------------------------------------------------------------------
+    // Bitrate
     public void getSuggestBitrate() {
         if ((gPing > 200 || (gRenderedFps > 3 && gRenderedFps < 50)) &&
                 suggestBitrate > ((TrafficStats.getTotalRxBytes() - TotalRx) / 125000)) {
@@ -3094,7 +3315,6 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                 suggestBitrate = 1;
             }
             if(!releaseVirsion){
-
                 autoReconnect();
             }
         }
@@ -3105,7 +3325,6 @@ public class Game extends Activity implements SurfaceHolder.Callback,
             }
         }
     }
-    //비트레이트 변경
     public void autoReconnect() {
         autoReconnectTimer = new Timer(true);
         autoReconnectTimer.schedule(new TimerTask() {
@@ -3118,7 +3337,6 @@ public class Game extends Activity implements SurfaceHolder.Callback,
             }
         }, 2000);
     }
-    // 비트레이트 자동 조정 - 다시 연결하기 위해 현재 화면을 캡쳐합니다.
     public void Reconnect() {
         if(!releaseVirsion){
             if (SurfaceViewState) {
@@ -3126,7 +3344,6 @@ public class Game extends Activity implements SurfaceHolder.Callback,
             }
         }
     }
-    // 비트레이트 변경시 고해상도 정지화면 캡쳐
     public void captureBitratePicture() {
         View surfaceView = streamView;
         Bitmap bmpb = Bitmap.createBitmap(surfaceView.getWidth(), surfaceView.getHeight(),
@@ -3136,7 +3353,6 @@ public class Game extends Activity implements SurfaceHolder.Callback,
             ReconnectOK();
         }, new Handler(Looper.getMainLooper()));
     }
-    // 비트레이트 자동 조정 - 화면 캡쳐가 끝나면 연결을 재시작합니다.
     public void ReconnectOK() {
         Activity ac = Game.this;
         AppView.restertConnection(ac);
@@ -3176,6 +3392,11 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                 controllerNumber, lowFreqMotor, highFreqMotor));
         controllerHandler.handleRumble(controllerNumber, lowFreqMotor, highFreqMotor);
     }
+    //______________________________________________________________________________________________
+
+
+
+
     //______________________________________________________________________________________________
 }
 

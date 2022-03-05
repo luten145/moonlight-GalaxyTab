@@ -638,7 +638,6 @@ public class MediaCodecDecoderRenderer extends VideoDecoderRenderer {
     public int submitDecodeUnit(byte[] decodeUnitData, int decodeUnitLength, int decodeUnitType,
                                 int frameNumber, long receiveTimeMs, long enqueueTimeMs) {
 
-
         if (stopping) {
             // Don't bother if we're stopping
             return MoonBridge.DR_OK;
@@ -663,9 +662,7 @@ public class MediaCodecDecoderRenderer extends VideoDecoderRenderer {
                 lastTwo.add(lastWindowVideoStats);
                 lastTwo.add(activeWindowVideoStats);
                 VideoStatsFps fps = lastTwo.getFps();
-
                 if (0 != 0) {
-
                     String decoder;
 
                     if ((videoFormat & MoonBridge.VIDEO_FORMAT_MASK_H264) != 0) {
@@ -677,7 +674,6 @@ public class MediaCodecDecoderRenderer extends VideoDecoderRenderer {
                     }
 
                 }
-
                 float decodeTimeMs = (float)lastTwo.decoderTimeMs/lastTwo.totalFramesReceived;
                 long rttInfo = MoonBridge.getEstimatedRttInfo();
 
